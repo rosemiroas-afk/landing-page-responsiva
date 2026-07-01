@@ -1,0 +1,1133 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Dashboard - Banco de Horas</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin:0; padding:24px;
+         background: linear-gradient(135deg,#f0f4f8 0%,#d9e2ec 100%); color:#1a2a44; }
+  header { background: linear-gradient(90deg,#003a70 0%,#0070d1 100%); color:#fff;
+           padding:20px 28px; border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,0.12); margin-bottom:20px;
+           display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px; }
+  header .titlebox h1 { margin:0 0 6px 0; font-size:24px; font-weight:600; }
+  header .sub { font-size:13px; opacity:0.9; }
+  #headerActions { display:flex; gap:10px; flex-wrap:wrap; }
+  .btn-action { padding:10px 16px; border:0; border-radius:8px; cursor:pointer; font-weight:600; font-size:13px;
+                box-shadow:0 2px 4px rgba(0,0,0,0.2); transition:all 0.15s ease; display:inline-flex; align-items:center; gap:6px; }
+  .btn-upload { background:#ff9800; color:#fff; }
+  .btn-upload:hover { background:#f57c00; }
+  .btn-pdf { background:#fff; color:#003a70; }
+  .btn-pdf:hover { background:#e8f0fe; }
+
+  .filters { background:#fff; padding:16px 18px; border-radius:12px; box-shadow:0 2px 8px rgba(0,0,0,0.08); margin-bottom:20px; }
+  .filter-group { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-bottom:10px; }
+  .filter-group:last-child { margin-bottom:0; }
+  .filter-label { font-size:12px; font-weight:600; color:#5a6b85; text-transform:uppercase;
+                  min-width:75px; letter-spacing:0.5px; }
+  .btn-filter { padding:6px 14px; background:#f0f4f8; color:#1a2a44; border:1px solid #d9e2ec;
+                border-radius:20px; cursor:pointer; font-size:12px; font-weight:600; transition: all 0.15s ease; }
+  .btn-filter:hover { background:#e2e8f0; }
+  .btn-filter.active { background:#003a70; color:#fff; border-color:#003a70; box-shadow:0 2px 4px rgba(0,58,112,0.3); }
+  .btn-clear { padding:6px 14px; background:#fff3e0; color:#e65100; border:1px solid #ffb74d;
+               border-radius:20px; cursor:pointer; font-size:12px; font-weight:600; margin-left:auto; }
+  .btn-clear:hover { background:#ffe0b2; }
+  .filter-info { font-size:12px; color:#5a6b85; font-style:italic; }
+
+  /* Histórico */
+  #historyPanel { background:#fff; border-radius:12px; box-shadow:0 2px 8px rgba(0,0,0,0.08); margin-bottom:20px; overflow:hidden; }
+  #historyToggle { padding:14px 18px; cursor:pointer; display:flex; justify-content:space-between; align-items:center;
+                   user-select:none; transition:background 0.15s; }
+  #historyToggle:hover { background:#f8fafc; }
+  #historyToggle .left { font-size:14px; color:#003a70; font-weight:600; display:flex; align-items:center; gap:8px; }
+  #historyToggle .count-badge { background:#003a70; color:#fff; padding:2px 9px; border-radius:12px; font-size:11px; font-weight:700; }
+  #historyToggle .arrow { transition:transform 0.2s; font-size:14px; color:#5a6b85; }
+  #historyToggle.open .arrow { transform:rotate(180deg); }
+  #historyContent { display:none; padding:0 18px 18px 18px; border-top:1px solid #eef0f3; }
+  #historyContent.open { display:block; }
+  .history-info { background:#e8f0fe; border-left:4px solid #0070d1; padding:10px 14px; border-radius:4px;
+                  font-size:12px; margin:14px 0; color:#1a2a44; line-height:1.5; }
+  #historyContent table { width:100%; border-collapse:collapse; font-size:12px; margin-top:8px; }
+  #historyContent th, #historyContent td { padding:7px 9px; text-align:left; border-bottom:1px solid #e2e8f0; }
+  #historyContent th { background:#f8fafc; color:#003a70; font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:0.5px; }
+  .btn-history { padding:4px 9px; background:#f0f4f8; color:#1a2a44; border:1px solid #d9e2ec;
+                 border-radius:6px; cursor:pointer; font-size:11px; font-weight:600; margin-right:3px; }
+  .btn-history:hover { background:#e2e8f0; }
+  .btn-history.load { background:#e3f2fd; color:#0d47a1; border-color:#90caf9; }
+  .btn-history.download { background:#e8f5e9; color:#1b5e20; border-color:#a5d6a7; }
+  .btn-history.delete { background:#ffebee; color:#b71c1c; border-color:#ef9a9a; }
+  .btn-clear-history { padding:6px 12px; background:#fdecec; color:#b71c1c; border:1px solid #ef9a9a;
+                       border-radius:6px; cursor:pointer; font-size:11px; font-weight:600; margin-top:6px; }
+  .btn-clear-history:hover { background:#ffcdd2; }
+
+  /* Toast */
+  #toastContainer { position:fixed; top:20px; right:20px; z-index:9999; display:flex; flex-direction:column; gap:8px; max-width:380px; }
+  .toast { padding:12px 16px; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.15);
+           color:#fff; font-size:13px; opacity:0; transform:translateX(20px);
+           transition: opacity 0.3s, transform 0.3s; }
+  .toast.show { opacity:1; transform:translateX(0); }
+  .toast.success { background:#2e7d32; }
+  .toast.error { background:#c62828; }
+  .toast.info { background:#0070d1; }
+
+  .kpis { display:grid; gap:16px; margin-bottom:24px; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); }
+  .kpi { background:#fff; padding:18px 20px; border-radius:12px; box-shadow:0 2px 8px rgba(0,0,0,0.08); border-left:5px solid #0070d1; }
+  .kpi.cred { border-left-color:#2e7d32; } .kpi.deb { border-left-color:#c62828; }
+  .kpi.saldo-pos { border-left-color:#2e7d32; } .kpi.saldo-neg { border-left-color:#c62828; }
+  .kpi .label { font-size:12px; text-transform:uppercase; color:#5a6b85; letter-spacing:0.5px; }
+  .kpi .value { font-size:26px; font-weight:700; margin-top:6px; }
+  .kpi.cred .value{color:#2e7d32;} .kpi.deb .value{color:#c62828;}
+  .kpi.saldo-pos .value{color:#2e7d32;} .kpi.saldo-neg .value{color:#c62828;}
+  .grid { display:grid; gap:20px; margin-bottom:24px; grid-template-columns:1fr; }
+  .grid.two { grid-template-columns:1fr 1fr; }
+  @media (max-width:900px){ .grid.two{ grid-template-columns:1fr; } }
+  .card { background:#fff; border-radius:12px; padding:18px 20px; box-shadow:0 2px 8px rgba(0,0,0,0.08); }
+  .card h2 { margin:0 0 14px 0; font-size:16px; color:#003a70; border-bottom:2px solid #e2e8f0; padding-bottom:8px; }
+  .chart-wrap { position:relative; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th,td { padding:8px 10px; text-align:left; border-bottom:1px solid #e2e8f0; }
+  th { background:#003a70; color:#fff; font-weight:600; position:sticky; top:0; }
+  td.num { text-align:right; font-variant-numeric:tabular-nums; }
+  tr.pos { background:#e8f5e9; } tr.neg { background:#ffebee; }
+  tr:hover { filter:brightness(0.97); }
+  footer { text-align:center; color:#5a6b85; font-size:12px; margin-top:28px; }
+  .alert-card { border-radius:12px; padding:18px 22px; color:#fff;
+                box-shadow:0 4px 14px rgba(0,0,0,0.12); position:relative; overflow:hidden; min-height:160px; }
+  .alert-card.cred { background: linear-gradient(135deg,#2e7d32 0%,#43a047 100%); }
+  .alert-card.deb  { background: linear-gradient(135deg,#c62828 0%,#e53935 100%); }
+  .alert-card .tag { font-size:11px; text-transform:uppercase; letter-spacing:1px; opacity:0.9; }
+  .alert-card .name { font-size:20px; font-weight:700; margin:6px 0 2px 0; }
+  .alert-card .cargo { font-size:13px; opacity:0.92; margin-bottom:12px; }
+  .alert-card .row { display:flex; flex-wrap:wrap; gap:18px; font-size:13px; }
+  .alert-card .row b { display:block; font-size:11px; text-transform:uppercase; opacity:0.85; letter-spacing:0.5px; margin-bottom:2px; }
+  .alert-card .val { font-size:20px; font-weight:700; }
+  .alert-card .days { position:absolute; top:14px; right:18px; background:rgba(255,255,255,0.22);
+                      padding:6px 12px; border-radius:20px; font-weight:700; font-size:13px; backdrop-filter: blur(4px); }
+
+  @media print {
+    @page { size: A4 landscape; margin: 10mm; }
+    body { background:#fff !important; padding:0 !important; }
+    .filters, #headerActions, #toastContainer, #historyPanel { display:none !important; }
+    header { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important;
+             background:#003a70 !important; color:#fff !important; border-radius:0 !important; }
+    .kpi, .card, .alert-card { box-shadow:none !important; page-break-inside: avoid; border:1px solid #ddd; }
+    .alert-card { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    .grid { page-break-inside: avoid; }
+    th { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important;
+         background:#003a70 !important; color:#fff !important; }
+    tr.pos td, tr.neg td { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="titlebox">
+    <h1>Dashboard - Banco de Horas (Créditos x Débitos) TÉCNICO REMOTO RSI</h1>
+    <div class="sub">Período dos lançamentos: <span id="periodo">23/04/2026 a 22/06/2026</span> &nbsp;|&nbsp; Atualizado em: <span id="gerEm">26/06/2026 17:12</span></div>
+  </div>
+  <div id="headerActions">
+    <button class="btn-action btn-upload" onclick="document.getElementById('fileInput').click()">📂 Carregar CSV</button>
+    <button class="btn-action btn-pdf" onclick="window.print()">🖨️ Exportar PDF</button>
+    <input type="file" id="fileInput" accept=".csv,.txt" style="display:none">
+  </div>
+</header>
+
+<div id="toastContainer"></div>
+
+<div class="filters">
+  <div class="filter-group">
+    <span class="filter-label">Tipo:</span>
+    <div id="filterTipo" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+  </div>
+  <div class="filter-group">
+    <span class="filter-label">Status:</span>
+    <div id="filterStatus" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+  </div>
+  <div class="filter-group">
+    <span class="filter-label">Cargo:</span>
+    <div id="filterCargo" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+  </div>
+<div class="filter-group">
+  <span class="filter-label">Colaborador:</span>
+  <select id="filtro-colaborador" onchange="filtrarPorColaborador()" style="padding:6px 14px; border-radius:12px; border:1px solid #d9e2ec; background-color:#f0f4f8; color:#1a2a44; font-family:inherit; font-size:12px; font-weight:600; cursor:pointer; min-width:200px;">
+    <option value="TODOS">TODOS</option>
+  </select>
+</div>
+  <div class="filter-group">
+    <span class="filter-info" id="filterInfo"></span>
+    <button class="btn-clear" onclick="clearFilters()">🔄 Limpar Filtros</button>
+  </div>
+</div>
+
+<div id="historyPanel">
+  <div id="historyToggle" onclick="toggleHistory()">
+    <div class="left">📚 Histórico de Atualizações <span class="count-badge" id="historyCount">0</span></div>
+    <div class="arrow">▼</div>
+  </div>
+  <div id="historyContent">
+    <div class="history-info">
+      ℹ️ Por questões de segurança, os navegadores não permitem criar pastas no seu computador automaticamente.
+      O histórico fica armazenado no <b>IndexedDB do navegador</b> (persiste mesmo após fechar o Edge/Chrome).
+      Para manter cópias permanentes em pasta local, use o botão <b>⬇️ Baixar</b> de cada versão e salve em uma
+      pasta de sua escolha (ex: <code>C:\BancoHoras\Historico\</code>).
+    </div>
+    <table>
+      <thead><tr><th>#</th><th>Arquivo</th><th>Upload</th><th>Período</th><th>Lanç.</th><th>Colab.</th><th>Ações</th></tr></thead>
+      <tbody id="historyTbody"></tbody>
+    </table>
+    <button class="btn-clear-history" onclick="confirmClearHistory()">🧹 Limpar Histórico</button>
+  </div>
+</div>
+
+<section class="kpis" id="kpis"></section>
+
+<div class="grid two">
+  <div id="alertCred"></div>
+  <div id="alertDeb"></div>
+</div>
+
+<div class="grid two">
+  <div class="card">
+    <h2>🟢 Top 15 Créditos mais próximos do vencimento</h2>
+    <table id="tblCred">
+      <thead><tr><th>Colaborador</th><th>Cargo</th><th>Data Realização</th><th class="num">Valor</th><th>Vencimento</th><th class="num">Dias</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+  <div class="card">
+    <h2>🔴 Top 15 Débitos mais próximos do vencimento</h2>
+    <table id="tblDeb">
+      <thead><tr><th>Colaborador</th><th>Cargo</th><th>Data Realização</th><th class="num">Valor</th><th>Vencimento</th><th class="num">Dias</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</div>
+
+
+
+<div class="grid">
+  <div class="card">
+    <h2>Saldo Líquido por Colaborador (HH:MM)</h2>
+    <div class="chart-wrap" style="height:540px;"><canvas id="chartSaldo"></canvas></div>
+  </div>
+</div>
+
+<div class="grid two">
+  <div class="card">
+    <h2>Créditos vs Débitos por Colaborador (Top 15 por volume)</h2>
+    <div class="chart-wrap" style="height:440px;"><canvas id="chartCD"></canvas></div>
+  </div>
+  <div class="card">
+    <h2>Distribuição por Tipo de Lançamento</h2>
+    <div class="chart-wrap" style="height:440px;"><canvas id="chartDist"></canvas></div>
+  </div>
+</div>
+
+<div class="grid">
+  <div class="card">
+    <h2>Evolução Diária - Créditos e Débitos (horas)</h2>
+    <div class="chart-wrap" style="height:360px;"><canvas id="chartDaily"></canvas></div>
+  </div>
+</div>
+
+<div class="grid">
+  <div class="card">
+    <h2>Detalhamento por Colaborador</h2>
+    <div style="max-height:520px; overflow-y:auto;">
+      <table id="tbl">
+        <thead>
+          <tr><th>#</th><th>Nome</th><th>Cargo</th><th>Status</th>
+              <th class="num">Créditos</th><th class="num">Débitos</th>
+              <th class="num">Saldo</th><th class="num">Lançamentos</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<footer>Dashboard gerado automaticamente a partir do arquivo <b id="currentFile">rhtk1144_130841 (14).csv</b></footer>
+
+<script>
+Chart.register(ChartDataLabels);
+
+const INITIAL = {"records": [{"nome": "SAMUEL RODRIGO FERREIRA INACIO DA ROCHA", "cargo": "TECNICO HEADEND I", "status": "AFASTADO", "tipo": "DEBITO", "descricao": "DEBITO BANCO DE HORAS - ATRASOS", "minutos": 32, "data_real": "23/04/2026", "data_real_iso": "2026-04-23", "data_real_str": "23/04/2026", "data_venc": "22/07/2026", "dias": 30}, {"nome": "IAGO RIBEIRO LIMA", "cargo": "ANL DATACENTER I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BH DSR/FERIADO", "minutos": 68, "data_real": "01/05/2026", "data_real_iso": "2026-05-01", "data_real_str": "01/05/2026", "data_venc": "30/07/2026", "dias": 38}, {"nome": "ROBERT DELPASSO DIAS", "cargo": "TECNICO HEADEND I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BH DSR/FERIADO", "minutos": 169, "data_real": "01/05/2026", "data_real_iso": "2026-05-01", "data_real_str": "01/05/2026", "data_venc": "30/07/2026", "dias": 38}, {"nome": "IAGO RIBEIRO LIMA", "cargo": "ANL DATACENTER I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 20, "data_real": "05/05/2026", "data_real_iso": "2026-05-05", "data_real_str": "05/05/2026", "data_venc": "03/08/2026", "dias": 42}, {"nome": "ROBERT DELPASSO DIAS", "cargo": "TECNICO HEADEND I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 30, "data_real": "05/05/2026", "data_real_iso": "2026-05-05", "data_real_str": "05/05/2026", "data_venc": "03/08/2026", "dias": 42}, {"nome": "ROBERT DELPASSO DIAS", "cargo": "TECNICO HEADEND I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 14, "data_real": "06/05/2026", "data_real_iso": "2026-05-06", "data_real_str": "06/05/2026", "data_venc": "04/08/2026", "dias": 43}, {"nome": "IAGO RIBEIRO LIMA", "cargo": "ANL DATACENTER I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 38, "data_real": "07/05/2026", "data_real_iso": "2026-05-07", "data_real_str": "07/05/2026", "data_venc": "05/08/2026", "dias": 44}, {"nome": "ROBERT DELPASSO DIAS", "cargo": "TECNICO HEADEND I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 30, "data_real": "09/05/2026", "data_real_iso": "2026-05-09", "data_real_str": "09/05/2026", "data_venc": "07/08/2026", "dias": 46}, {"nome": "IAGO RIBEIRO LIMA", "cargo": "ANL DATACENTER I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 13, "data_real": "12/05/2026", "data_real_iso": "2026-05-12", "data_real_str": "12/05/2026", "data_venc": "10/08/2026", "dias": 49}, {"nome": "ROBERT DELPASSO DIAS", "cargo": "TECNICO HEADEND I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 12, "data_real": "12/05/2026", "data_real_iso": "2026-05-12", "data_real_str": "12/05/2026", "data_venc": "10/08/2026", "dias": 49}, {"nome": "ROBERT DELPASSO DIAS", "cargo": "TECNICO HEADEND I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 21, "data_real": "13/05/2026", "data_real_iso": "2026-05-13", "data_real_str": "13/05/2026", "data_venc": "11/08/2026", "dias": 50}, {"nome": "CARLOS HENRIQUE SBRISSA", "cargo": "TECNICO HEADEND II", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 9, "data_real": "14/05/2026", "data_real_iso": "2026-05-14", "data_real_str": "14/05/2026", "data_venc": "12/08/2026", "dias": 51}, {"nome": "IAGO RIBEIRO LIMA", "cargo": "ANL DATACENTER I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 36, "data_real": "14/05/2026", "data_real_iso": "2026-05-14", "data_real_str": "14/05/2026", "data_venc": "12/08/2026", "dias": 51}, {"nome": "CARLOS HENRIQUE SBRISSA", "cargo": "TECNICO HEADEND II", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 20, "data_real": "15/05/2026", "data_real_iso": "2026-05-15", "data_real_str": "15/05/2026", "data_venc": "13/08/2026", "dias": 52}, {"nome": "IAGO RIBEIRO LIMA", "cargo": "ANL DATACENTER I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 22, "data_real": "15/05/2026", "data_real_iso": "2026-05-15", "data_real_str": "15/05/2026", "data_venc": "13/08/2026", "dias": 52}, {"nome": "ROBERT DELPASSO DIAS", "cargo": "TECNICO HEADEND I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 17, "data_real": "16/05/2026", "data_real_iso": "2026-05-16", "data_real_str": "16/05/2026", "data_venc": "14/08/2026", "dias": 53}, {"nome": "RODRIGO ALVES SILVERIO", "cargo": "ANL DATACENTER I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 29, "data_real": "17/05/2026", "data_real_iso": "2026-05-17", "data_real_str": "17/05/2026", "data_venc": "15/08/2026", "dias": 54}, {"nome": "RODRIGO ALVES SILVERIO", "cargo": "ANL DATACENTER I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 18, "data_real": "18/05/2026", "data_real_iso": "2026-05-18", "data_real_str": "18/05/2026", "data_venc": "16/08/2026", "dias": 55}, {"nome": "RODRIGO ALVES SILVERIO", "cargo": "ANL DATACENTER I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 19, "data_real": "19/05/2026", "data_real_iso": "2026-05-19", "data_real_str": "19/05/2026", "data_venc": "17/08/2026", "dias": 56}, {"nome": "CARLOS HENRIQUE SBRISSA", "cargo": "TECNICO HEADEND II", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 29, "data_real": "19/05/2026", "data_real_iso": "2026-05-19", "data_real_str": "19/05/2026", "data_venc": "17/08/2026", "dias": 56}, {"nome": "ROBERT DELPASSO DIAS", "cargo": "TECNICO HEADEND I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 12, "data_real": "19/05/2026", "data_real_iso": "2026-05-19", "data_real_str": "19/05/2026", "data_venc": "17/08/2026", "dias": 56}, {"nome": "IAGO RIBEIRO LIMA", "cargo": "ANL DATACENTER I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 17, "data_real": "20/05/2026", "data_real_iso": "2026-05-20", "data_real_str": "20/05/2026", "data_venc": "18/08/2026", "dias": 57}, {"nome": "RODRIGO ALVES SILVERIO", "cargo": "ANL DATACENTER I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 11, "data_real": "21/05/2026", "data_real_iso": "2026-05-21", "data_real_str": "21/05/2026", "data_venc": "19/08/2026", "dias": 58}, {"nome": "ROBERT DELPASSO DIAS", "cargo": "TECNICO HEADEND I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 22, "data_real": "21/05/2026", "data_real_iso": "2026-05-21", "data_real_str": "21/05/2026", "data_venc": "19/08/2026", "dias": 58}, {"nome": "RODRIGO ALVES SILVERIO", "cargo": "ANL DATACENTER I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 21, "data_real": "22/05/2026", "data_real_iso": "2026-05-22", "data_real_str": "22/05/2026", "data_venc": "20/08/2026", "dias": 59}, {"nome": "ROBERT DELPASSO DIAS", "cargo": "TECNICO HEADEND I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 17, "data_real": "22/05/2026", "data_real_iso": "2026-05-22", "data_real_str": "22/05/2026", "data_venc": "20/08/2026", "dias": 59}, {"nome": "ROBERT DELPASSO DIAS", "cargo": "TECNICO HEADEND I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BH DSR/FERIADO", "minutos": 49, "data_real": "24/05/2026", "data_real_iso": "2026-05-24", "data_real_str": "24/05/2026", "data_venc": "22/08/2026", "dias": 61}, {"nome": "ISRAEL ANDRADE DE OLIVEIRA", "cargo": "TECNICO HEADEND I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BH DSR/FERIADO", "minutos": 99, "data_real": "24/05/2026", "data_real_iso": "2026-05-24", "data_real_str": "24/05/2026", "data_venc": "22/08/2026", "dias": 61}, {"nome": "RODRIGO ALVES SILVERIO", "cargo": "ANL DATACENTER I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 35, "data_real": "25/05/2026", "data_real_iso": "2026-05-25", "data_real_str": "25/05/2026", "data_venc": "23/08/2026", "dias": 62}, {"nome": "CARLOS HENRIQUE SBRISSA", "cargo": "TECNICO HEADEND II", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 50, "data_real": "25/05/2026", "data_real_iso": "2026-05-25", "data_real_str": "25/05/2026", "data_venc": "23/08/2026", "dias": 62}, {"nome": "ISRAEL ANDRADE DE OLIVEIRA", "cargo": "TECNICO HEADEND I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 30, "data_real": "25/05/2026", "data_real_iso": "2026-05-25", "data_real_str": "25/05/2026", "data_venc": "23/08/2026", "dias": 62}, {"nome": "RODRIGO ALVES SILVERIO", "cargo": "ANL DATACENTER I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 21, "data_real": "26/05/2026", "data_real_iso": "2026-05-26", "data_real_str": "26/05/2026", "data_venc": "24/08/2026", "dias": 63}, {"nome": "ROBERT DELPASSO DIAS", "cargo": "TECNICO HEADEND I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 88, "data_real": "26/05/2026", "data_real_iso": "2026-05-26", "data_real_str": "26/05/2026", "data_venc": "24/08/2026", "dias": 63}, {"nome": "RODRIGO ALVES SILVERIO", "cargo": "ANL DATACENTER I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 16, "data_real": "27/05/2026", "data_real_iso": "2026-05-27", "data_real_str": "27/05/2026", "data_venc": "25/08/2026", "dias": 64}, {"nome": "CARLOS HENRIQUE SBRISSA", "cargo": "TECNICO HEADEND II", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 26, "data_real": "27/05/2026", "data_real_iso": "2026-05-27", "data_real_str": "27/05/2026", "data_venc": "25/08/2026", "dias": 64}, {"nome": "ISRAEL ANDRADE DE OLIVEIRA", "cargo": "TECNICO HEADEND I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 43, "data_real": "27/05/2026", "data_real_iso": "2026-05-27", "data_real_str": "27/05/2026", "data_venc": "25/08/2026", "dias": 64}, {"nome": "RODRIGO ALVES SILVERIO", "cargo": "ANL DATACENTER I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 19, "data_real": "28/05/2026", "data_real_iso": "2026-05-28", "data_real_str": "28/05/2026", "data_venc": "26/08/2026", "dias": 65}, {"nome": "IAGO RIBEIRO LIMA", "cargo": "ANL DATACENTER I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 55, "data_real": "28/05/2026", "data_real_iso": "2026-05-28", "data_real_str": "28/05/2026", "data_venc": "26/08/2026", "dias": 65}, {"nome": "VALDENIR MAZZARI", "cargo": "TECNICO HEADEND II", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 44, "data_real": "28/05/2026", "data_real_iso": "2026-05-28", "data_real_str": "28/05/2026", "data_venc": "26/08/2026", "dias": 65}, {"nome": "ALLYSONN JORGE DOS SANTOS", "cargo": "ANL DATACENTER II", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 16, "data_real": "28/05/2026", "data_real_iso": "2026-05-28", "data_real_str": "28/05/2026", "data_venc": "26/08/2026", "dias": 65}, {"nome": "ANSELMO DIOGO DE CASTRO", "cargo": "TECNICO HEADEND I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 27, "data_real": "28/05/2026", "data_real_iso": "2026-05-28", "data_real_str": "28/05/2026", "data_venc": "26/08/2026", "dias": 65}, {"nome": "ISRAEL ANDRADE DE OLIVEIRA", "cargo": "TECNICO HEADEND I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 18, "data_real": "28/05/2026", "data_real_iso": "2026-05-28", "data_real_str": "28/05/2026", "data_venc": "26/08/2026", "dias": 65}, {"nome": "RODRIGO ALVES SILVERIO", "cargo": "ANL DATACENTER I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 14, "data_real": "29/05/2026", "data_real_iso": "2026-05-29", "data_real_str": "29/05/2026", "data_venc": "27/08/2026", "dias": 66}, {"nome": "IAGO RIBEIRO LIMA", "cargo": "ANL DATACENTER I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 37, "data_real": "29/05/2026", "data_real_iso": "2026-05-29", "data_real_str": "29/05/2026", "data_venc": "27/08/2026", "dias": 66}, {"nome": "WILSON COLARES DOS SANTOS", "cargo": "TECNICO HEADEND I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 9, "data_real": "29/05/2026", "data_real_iso": "2026-05-29", "data_real_str": "29/05/2026", "data_venc": "27/08/2026", "dias": 66}, {"nome": "ANSELMO DIOGO DE CASTRO", "cargo": "TECNICO HEADEND I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 31, "data_real": "29/05/2026", "data_real_iso": "2026-05-29", "data_real_str": "29/05/2026", "data_venc": "27/08/2026", "dias": 66}, {"nome": "IAGO RIBEIRO LIMA", "cargo": "ANL DATACENTER I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 11, "data_real": "01/06/2026", "data_real_iso": "2026-06-01", "data_real_str": "01/06/2026", "data_venc": "30/08/2026", "dias": 69}, {"nome": "ANSELMO DIOGO DE CASTRO", "cargo": "TECNICO HEADEND I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 12, "data_real": "02/06/2026", "data_real_iso": "2026-06-02", "data_real_str": "02/06/2026", "data_venc": "31/08/2026", "dias": 70}, {"nome": "RODRIGO ALVES SILVERIO", "cargo": "ANL DATACENTER I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 15, "data_real": "02/06/2026", "data_real_iso": "2026-06-02", "data_real_str": "02/06/2026", "data_venc": "31/08/2026", "dias": 70}, {"nome": "ISRAEL ANDRADE DE OLIVEIRA", "cargo": "TECNICO HEADEND I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 16, "data_real": "03/06/2026", "data_real_iso": "2026-06-03", "data_real_str": "03/06/2026", "data_venc": "01/09/2026", "dias": 71}, {"nome": "ALLYSONN JORGE DOS SANTOS", "cargo": "ANL DATACENTER II", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 35, "data_real": "03/06/2026", "data_real_iso": "2026-06-03", "data_real_str": "03/06/2026", "data_venc": "01/09/2026", "dias": 71}, {"nome": "CARLOS HENRIQUE SBRISSA", "cargo": "TECNICO HEADEND II", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 52, "data_real": "03/06/2026", "data_real_iso": "2026-06-03", "data_real_str": "03/06/2026", "data_venc": "01/09/2026", "dias": 71}, {"nome": "SERGIO SILVA DE CAMPOS", "cargo": "ANL DATACENTER I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BH DSR/FERIADO", "minutos": 55, "data_real": "04/06/2026", "data_real_iso": "2026-06-04", "data_real_str": "04/06/2026", "data_venc": "02/09/2026", "dias": 72}, {"nome": "RODRIGO SANCHES ASSONI", "cargo": "ANL DATACENTER I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BH DSR/FERIADO", "minutos": 152, "data_real": "04/06/2026", "data_real_iso": "2026-06-04", "data_real_str": "04/06/2026", "data_venc": "02/09/2026", "dias": 72}, {"nome": "JOSE MARCOS GONCALVES CANEIRA", "cargo": "ANL DATACENTER II", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BH DSR/FERIADO", "minutos": 257, "data_real": "04/06/2026", "data_real_iso": "2026-06-04", "data_real_str": "04/06/2026", "data_venc": "02/09/2026", "dias": 72}, {"nome": "LUIZ EDUARDO DE FREITAS JUNIOR", "cargo": "TECNICO HEADEND I", "status": "ATIVO", "tipo": "DEBITO", "descricao": "DEBITO BANCO DE HORAS - FALTAS", "minutos": 36, "data_real": "05/06/2026", "data_real_iso": "2026-06-05", "data_real_str": "05/06/2026", "data_venc": "03/09/2026", "dias": 73}, {"nome": "ANSELMO DIOGO DE CASTRO", "cargo": "TECNICO HEADEND I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 22, "data_real": "05/06/2026", "data_real_iso": "2026-06-05", "data_real_str": "05/06/2026", "data_venc": "03/09/2026", "dias": 73}, {"nome": "ROSELITO PEDROSA", "cargo": "ANL DATACENTER I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 26, "data_real": "05/06/2026", "data_real_iso": "2026-06-05", "data_real_str": "05/06/2026", "data_venc": "03/09/2026", "dias": 73}, {"nome": "RODRIGO SANCHES ASSONI", "cargo": "ANL DATACENTER I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 19, "data_real": "05/06/2026", "data_real_iso": "2026-06-05", "data_real_str": "05/06/2026", "data_venc": "03/09/2026", "dias": 73}, {"nome": "PRISCILA FABIANA CORRALES", "cargo": "TECNICO HEADEND I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 86, "data_real": "05/06/2026", "data_real_iso": "2026-06-05", "data_real_str": "05/06/2026", "data_venc": "03/09/2026", "dias": 73}, {"nome": "ALLYSONN JORGE DOS SANTOS", "cargo": "ANL DATACENTER II", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 341, "data_real": "06/06/2026", "data_real_iso": "2026-06-06", "data_real_str": "06/06/2026", "data_venc": "04/09/2026", "dias": 74}, {"nome": "LUIZ FERNANDO MARTINS", "cargo": "ANL DATACENTER I", "status": "ATIVO", "tipo": "DEBITO", "descricao": "DEBITO BANCO DE HORAS - FALTAS", "minutos": 219, "data_real": "06/06/2026", "data_real_iso": "2026-06-06", "data_real_str": "06/06/2026", "data_venc": "04/09/2026", "dias": 74}, {"nome": "IAGO RIBEIRO LIMA", "cargo": "ANL DATACENTER I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 23, "data_real": "06/06/2026", "data_real_iso": "2026-06-06", "data_real_str": "06/06/2026", "data_venc": "04/09/2026", "dias": 74}, {"nome": "RODRIGO ALVES SILVERIO", "cargo": "ANL DATACENTER I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 17, "data_real": "07/06/2026", "data_real_iso": "2026-06-07", "data_real_str": "07/06/2026", "data_venc": "05/09/2026", "dias": 75}, {"nome": "JOSE MARCOS GONCALVES CANEIRA", "cargo": "ANL DATACENTER II", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 17, "data_real": "07/06/2026", "data_real_iso": "2026-06-07", "data_real_str": "07/06/2026", "data_venc": "05/09/2026", "dias": 75}, {"nome": "VALDENIR MAZZARI", "cargo": "TECNICO HEADEND II", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 33, "data_real": "08/06/2026", "data_real_iso": "2026-06-08", "data_real_str": "08/06/2026", "data_venc": "06/09/2026", "dias": 76}, {"nome": "ISRAEL ANDRADE DE OLIVEIRA", "cargo": "TECNICO HEADEND I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 37, "data_real": "08/06/2026", "data_real_iso": "2026-06-08", "data_real_str": "08/06/2026", "data_venc": "06/09/2026", "dias": 76}, {"nome": "CARLOS HENRIQUE SBRISSA", "cargo": "TECNICO HEADEND II", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 32, "data_real": "08/06/2026", "data_real_iso": "2026-06-08", "data_real_str": "08/06/2026", "data_venc": "06/09/2026", "dias": 76}, {"nome": "PRISCILA FABIANA CORRALES", "cargo": "TECNICO HEADEND I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 26, "data_real": "08/06/2026", "data_real_iso": "2026-06-08", "data_real_str": "08/06/2026", "data_venc": "06/09/2026", "dias": 76}, {"nome": "RODRIGO ALVES SILVERIO", "cargo": "ANL DATACENTER I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 15, "data_real": "08/06/2026", "data_real_iso": "2026-06-08", "data_real_str": "08/06/2026", "data_venc": "06/09/2026", "dias": 76}, {"nome": "ANSELMO DIOGO DE CASTRO", "cargo": "TECNICO HEADEND I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 12, "data_real": "09/06/2026", "data_real_iso": "2026-06-09", "data_real_str": "09/06/2026", "data_venc": "07/09/2026", "dias": 77}, {"nome": "ROSELITO PEDROSA", "cargo": "ANL DATACENTER I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 38, "data_real": "09/06/2026", "data_real_iso": "2026-06-09", "data_real_str": "09/06/2026", "data_venc": "07/09/2026", "dias": 77}, {"nome": "ROBERT DELPASSO DIAS", "cargo": "TECNICO HEADEND I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 34, "data_real": "09/06/2026", "data_real_iso": "2026-06-09", "data_real_str": "09/06/2026", "data_venc": "07/09/2026", "dias": 77}, {"nome": "ANDERSON PAULO ISIDORO", "cargo": "TECNICO HEADEND II", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 19, "data_real": "09/06/2026", "data_real_iso": "2026-06-09", "data_real_str": "09/06/2026", "data_venc": "07/09/2026", "dias": 77}, {"nome": "LUIZ EDUARDO DE FREITAS JUNIOR", "cargo": "TECNICO HEADEND I", "status": "ATIVO", "tipo": "DEBITO", "descricao": "DEBITO BANCO DE HORAS - ATRASOS", "minutos": 103, "data_real": "10/06/2026", "data_real_iso": "2026-06-10", "data_real_str": "10/06/2026", "data_venc": "08/09/2026", "dias": 78}, {"nome": "VALDENIR MAZZARI", "cargo": "TECNICO HEADEND II", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 53, "data_real": "10/06/2026", "data_real_iso": "2026-06-10", "data_real_str": "10/06/2026", "data_venc": "08/09/2026", "dias": 78}, {"nome": "RICARDO CASTELLAN", "cargo": "TECNICO HEADEND I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 70, "data_real": "10/06/2026", "data_real_iso": "2026-06-10", "data_real_str": "10/06/2026", "data_venc": "08/09/2026", "dias": 78}, {"nome": "ROBERT DELPASSO DIAS", "cargo": "TECNICO HEADEND I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 12, "data_real": "10/06/2026", "data_real_iso": "2026-06-10", "data_real_str": "10/06/2026", "data_venc": "08/09/2026", "dias": 78}, {"nome": "CARLOS HENRIQUE SBRISSA", "cargo": "TECNICO HEADEND II", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 37, "data_real": "10/06/2026", "data_real_iso": "2026-06-10", "data_real_str": "10/06/2026", "data_venc": "08/09/2026", "dias": 78}, {"nome": "RODRIGO ALVES SILVERIO", "cargo": "ANL DATACENTER I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 17, "data_real": "10/06/2026", "data_real_iso": "2026-06-10", "data_real_str": "10/06/2026", "data_venc": "08/09/2026", "dias": 78}, {"nome": "RODRIGO SANCHES ASSONI", "cargo": "ANL DATACENTER I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 21, "data_real": "11/06/2026", "data_real_iso": "2026-06-11", "data_real_str": "11/06/2026", "data_venc": "09/09/2026", "dias": 79}, {"nome": "PRISCILA FABIANA CORRALES", "cargo": "TECNICO HEADEND I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 26, "data_real": "11/06/2026", "data_real_iso": "2026-06-11", "data_real_str": "11/06/2026", "data_venc": "09/09/2026", "dias": 79}, {"nome": "LUIZ EDUARDO DE FREITAS JUNIOR", "cargo": "TECNICO HEADEND I", "status": "ATIVO", "tipo": "DEBITO", "descricao": "DEBITO BANCO DE HORAS - ATRASOS", "minutos": 121, "data_real": "11/06/2026", "data_real_iso": "2026-06-11", "data_real_str": "11/06/2026", "data_venc": "09/09/2026", "dias": 79}, {"nome": "ISRAEL ANDRADE DE OLIVEIRA", "cargo": "TECNICO HEADEND I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 13, "data_real": "11/06/2026", "data_real_iso": "2026-06-11", "data_real_str": "11/06/2026", "data_venc": "09/09/2026", "dias": 79}, {"nome": "ROSELITO PEDROSA", "cargo": "ANL DATACENTER I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 39, "data_real": "11/06/2026", "data_real_iso": "2026-06-11", "data_real_str": "11/06/2026", "data_venc": "09/09/2026", "dias": 79}, {"nome": "RICARDO CASTELLAN", "cargo": "TECNICO HEADEND I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 35, "data_real": "11/06/2026", "data_real_iso": "2026-06-11", "data_real_str": "11/06/2026", "data_venc": "09/09/2026", "dias": 79}, {"nome": "LUIZ EDUARDO DE FREITAS JUNIOR", "cargo": "TECNICO HEADEND I", "status": "ATIVO", "tipo": "DEBITO", "descricao": "DEBITO BANCO DE HORAS - ATRASOS", "minutos": 99, "data_real": "12/06/2026", "data_real_iso": "2026-06-12", "data_real_str": "12/06/2026", "data_venc": "10/09/2026", "dias": 80}, {"nome": "ANSELMO DIOGO DE CASTRO", "cargo": "TECNICO HEADEND I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 27, "data_real": "12/06/2026", "data_real_iso": "2026-06-12", "data_real_str": "12/06/2026", "data_venc": "10/09/2026", "dias": 80}, {"nome": "ISRAEL ANDRADE DE OLIVEIRA", "cargo": "TECNICO HEADEND I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 12, "data_real": "12/06/2026", "data_real_iso": "2026-06-12", "data_real_str": "12/06/2026", "data_venc": "10/09/2026", "dias": 80}, {"nome": "ROSELITO PEDROSA", "cargo": "ANL DATACENTER I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 41, "data_real": "12/06/2026", "data_real_iso": "2026-06-12", "data_real_str": "12/06/2026", "data_venc": "10/09/2026", "dias": 80}, {"nome": "LEONARDO CARCELIM FERNANDES", "cargo": "TECNICO HEADEND I", "status": "ATIVO", "tipo": "DEBITO", "descricao": "DEBITO BANCO DE HORAS - FALTAS", "minutos": 269, "data_real": "12/06/2026", "data_real_iso": "2026-06-12", "data_real_str": "12/06/2026", "data_venc": "10/09/2026", "dias": 80}, {"nome": "VALDENIR MAZZARI", "cargo": "TECNICO HEADEND II", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 15, "data_real": "12/06/2026", "data_real_iso": "2026-06-12", "data_real_str": "12/06/2026", "data_venc": "10/09/2026", "dias": 80}, {"nome": "SERGIO SILVA DE CAMPOS", "cargo": "ANL DATACENTER I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 13, "data_real": "12/06/2026", "data_real_iso": "2026-06-12", "data_real_str": "12/06/2026", "data_venc": "10/09/2026", "dias": 80}, {"nome": "LUCAS DE PAULA SOUZA", "cargo": "ANL DATACENTER III", "status": "ATIVO", "tipo": "DEBITO", "descricao": "DEBITO BANCO DE HORAS - ATRASOS", "minutos": 21, "data_real": "12/06/2026", "data_real_iso": "2026-06-12", "data_real_str": "12/06/2026", "data_venc": "10/09/2026", "dias": 80}, {"nome": "CARLOS HENRIQUE SBRISSA", "cargo": "TECNICO HEADEND II", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 14, "data_real": "12/06/2026", "data_real_iso": "2026-06-12", "data_real_str": "12/06/2026", "data_venc": "10/09/2026", "dias": 80}, {"nome": "ROBERT DELPASSO DIAS", "cargo": "TECNICO HEADEND I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 12, "data_real": "13/06/2026", "data_real_iso": "2026-06-13", "data_real_str": "13/06/2026", "data_venc": "11/09/2026", "dias": 81}, {"nome": "ANDERSON PAULO ISIDORO", "cargo": "TECNICO HEADEND II", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 120, "data_real": "13/06/2026", "data_real_iso": "2026-06-13", "data_real_str": "13/06/2026", "data_venc": "11/09/2026", "dias": 81}, {"nome": "ANDERSON PAULO ISIDORO", "cargo": "TECNICO HEADEND II", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS SUP. 2", "minutos": 8, "data_real": "13/06/2026", "data_real_iso": "2026-06-13", "data_real_str": "13/06/2026", "data_venc": "11/09/2026", "dias": 81}, {"nome": "LUCAS DE PAULA SOUZA", "cargo": "ANL DATACENTER III", "status": "ATIVO", "tipo": "DEBITO", "descricao": "DEBITO BANCO DE HORAS - ATRASOS", "minutos": 28, "data_real": "13/06/2026", "data_real_iso": "2026-06-13", "data_real_str": "13/06/2026", "data_venc": "11/09/2026", "dias": 81}, {"nome": "RODRIGO ALVES SILVERIO", "cargo": "ANL DATACENTER I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 13, "data_real": "14/06/2026", "data_real_iso": "2026-06-14", "data_real_str": "14/06/2026", "data_venc": "12/09/2026", "dias": 82}, {"nome": "ANSELMO DIOGO DE CASTRO", "cargo": "TECNICO HEADEND I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 36, "data_real": "15/06/2026", "data_real_iso": "2026-06-15", "data_real_str": "15/06/2026", "data_venc": "13/09/2026", "dias": 83}, {"nome": "ISRAEL ANDRADE DE OLIVEIRA", "cargo": "TECNICO HEADEND I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 25, "data_real": "15/06/2026", "data_real_iso": "2026-06-15", "data_real_str": "15/06/2026", "data_venc": "13/09/2026", "dias": 83}, {"nome": "SERGIO SILVA DE CAMPOS", "cargo": "ANL DATACENTER I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 11, "data_real": "15/06/2026", "data_real_iso": "2026-06-15", "data_real_str": "15/06/2026", "data_venc": "13/09/2026", "dias": 83}, {"nome": "ROBERT DELPASSO DIAS", "cargo": "TECNICO HEADEND I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 12, "data_real": "15/06/2026", "data_real_iso": "2026-06-15", "data_real_str": "15/06/2026", "data_venc": "13/09/2026", "dias": 83}, {"nome": "LUIZ FERNANDO MARTINS", "cargo": "ANL DATACENTER I", "status": "ATIVO", "tipo": "DEBITO", "descricao": "DEBITO BANCO DE HORAS - ATRASOS", "minutos": 31, "data_real": "15/06/2026", "data_real_iso": "2026-06-15", "data_real_str": "15/06/2026", "data_venc": "13/09/2026", "dias": 83}, {"nome": "IAGO RIBEIRO LIMA", "cargo": "ANL DATACENTER I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 34, "data_real": "15/06/2026", "data_real_iso": "2026-06-15", "data_real_str": "15/06/2026", "data_venc": "13/09/2026", "dias": 83}, {"nome": "ANDERSON PAULO ISIDORO", "cargo": "TECNICO HEADEND II", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 11, "data_real": "15/06/2026", "data_real_iso": "2026-06-15", "data_real_str": "15/06/2026", "data_venc": "13/09/2026", "dias": 83}, {"nome": "RODRIGO ALVES SILVERIO", "cargo": "ANL DATACENTER I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 19, "data_real": "15/06/2026", "data_real_iso": "2026-06-15", "data_real_str": "15/06/2026", "data_venc": "13/09/2026", "dias": 83}, {"nome": "ISRAEL ANDRADE DE OLIVEIRA", "cargo": "TECNICO HEADEND I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 38, "data_real": "16/06/2026", "data_real_iso": "2026-06-16", "data_real_str": "16/06/2026", "data_venc": "14/09/2026", "dias": 84}, {"nome": "CARLOS HENRIQUE SBRISSA", "cargo": "TECNICO HEADEND II", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 34, "data_real": "16/06/2026", "data_real_iso": "2026-06-16", "data_real_str": "16/06/2026", "data_venc": "14/09/2026", "dias": 84}, {"nome": "SERGIO SILVA DE CAMPOS", "cargo": "ANL DATACENTER I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 11, "data_real": "17/06/2026", "data_real_iso": "2026-06-17", "data_real_str": "17/06/2026", "data_venc": "15/09/2026", "dias": 85}, {"nome": "OSEIAS DA ROCHA FERREIRA", "cargo": "ANL DATACENTER I", "status": "ATIVO", "tipo": "DEBITO", "descricao": "DEBITO BANCO DE HORAS - FALTAS", "minutos": 148, "data_real": "17/06/2026", "data_real_iso": "2026-06-17", "data_real_str": "17/06/2026", "data_venc": "15/09/2026", "dias": 85}, {"nome": "RICARDO VAGNER STOCO JUNIOR", "cargo": "ASSIST ADMINISTRATIVO I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 24, "data_real": "17/06/2026", "data_real_iso": "2026-06-17", "data_real_str": "17/06/2026", "data_venc": "15/09/2026", "dias": 85}, {"nome": "LUIZ EDUARDO DE FREITAS JUNIOR", "cargo": "TECNICO HEADEND I", "status": "ATIVO", "tipo": "DEBITO", "descricao": "DEBITO BANCO DE HORAS - ATRASOS", "minutos": 40, "data_real": "17/06/2026", "data_real_iso": "2026-06-17", "data_real_str": "17/06/2026", "data_venc": "15/09/2026", "dias": 85}, {"nome": "CARLOS HENRIQUE SBRISSA", "cargo": "TECNICO HEADEND II", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 22, "data_real": "17/06/2026", "data_real_iso": "2026-06-17", "data_real_str": "17/06/2026", "data_venc": "15/09/2026", "dias": 85}, {"nome": "RODRIGO SANCHES ASSONI", "cargo": "ANL DATACENTER I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 17, "data_real": "17/06/2026", "data_real_iso": "2026-06-17", "data_real_str": "17/06/2026", "data_venc": "15/09/2026", "dias": 85}, {"nome": "ROSELITO PEDROSA", "cargo": "ANL DATACENTER I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 21, "data_real": "18/06/2026", "data_real_iso": "2026-06-18", "data_real_str": "18/06/2026", "data_venc": "16/09/2026", "dias": 86}, {"nome": "LEONARDO CARCELIM FERNANDES", "cargo": "TECNICO HEADEND I", "status": "ATIVO", "tipo": "DEBITO", "descricao": "DEBITO BANCO DE HORAS - ATRASOS", "minutos": 19, "data_real": "18/06/2026", "data_real_iso": "2026-06-18", "data_real_str": "18/06/2026", "data_venc": "16/09/2026", "dias": 86}, {"nome": "VALDENIR MAZZARI", "cargo": "TECNICO HEADEND II", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 12, "data_real": "18/06/2026", "data_real_iso": "2026-06-18", "data_real_str": "18/06/2026", "data_venc": "16/09/2026", "dias": 86}, {"nome": "ROBERT DELPASSO DIAS", "cargo": "TECNICO HEADEND I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 13, "data_real": "18/06/2026", "data_real_iso": "2026-06-18", "data_real_str": "18/06/2026", "data_venc": "16/09/2026", "dias": 86}, {"nome": "CARLOS HENRIQUE SBRISSA", "cargo": "TECNICO HEADEND II", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 22, "data_real": "18/06/2026", "data_real_iso": "2026-06-18", "data_real_str": "18/06/2026", "data_venc": "16/09/2026", "dias": 86}, {"nome": "ISRAEL ANDRADE DE OLIVEIRA", "cargo": "TECNICO HEADEND I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 37, "data_real": "19/06/2026", "data_real_iso": "2026-06-19", "data_real_str": "19/06/2026", "data_venc": "17/09/2026", "dias": 87}, {"nome": "ROSELITO PEDROSA", "cargo": "ANL DATACENTER I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 47, "data_real": "19/06/2026", "data_real_iso": "2026-06-19", "data_real_str": "19/06/2026", "data_venc": "17/09/2026", "dias": 87}, {"nome": "ALLYSONN JORGE DOS SANTOS", "cargo": "ANL DATACENTER II", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 68, "data_real": "19/06/2026", "data_real_iso": "2026-06-19", "data_real_str": "19/06/2026", "data_venc": "17/09/2026", "dias": 87}, {"nome": "ROBERT DELPASSO DIAS", "cargo": "TECNICO HEADEND I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 12, "data_real": "19/06/2026", "data_real_iso": "2026-06-19", "data_real_str": "19/06/2026", "data_venc": "17/09/2026", "dias": 87}, {"nome": "MARCOS VINICIOS NOGUEIRA DE SOUZA", "cargo": "ANL DATACENTER II", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BH DSR/FERIADO", "minutos": 372, "data_real": "19/06/2026", "data_real_iso": "2026-06-19", "data_real_str": "19/06/2026", "data_venc": "17/09/2026", "dias": 87}, {"nome": "CLAUDIVAN PINTO SANTOS", "cargo": "TECNICO HEADEND I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BH DSR/FERIADO", "minutos": 408, "data_real": "19/06/2026", "data_real_iso": "2026-06-19", "data_real_str": "19/06/2026", "data_venc": "17/09/2026", "dias": 87}, {"nome": "RAFAEL DEIVE PUTTI", "cargo": "TECNICO HEADEND I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BH DSR/FERIADO", "minutos": 422, "data_real": "19/06/2026", "data_real_iso": "2026-06-19", "data_real_str": "19/06/2026", "data_venc": "17/09/2026", "dias": 87}, {"nome": "BRUNO CARLOS SALGADO DIAS", "cargo": "ANL DATACENTER I", "status": "ATIVO", "tipo": "DEBITO", "descricao": "DEBITO BANCO DE HORAS - FALTAS", "minutos": 7, "data_real": "20/06/2026", "data_real_iso": "2026-06-20", "data_real_str": "20/06/2026", "data_venc": "18/09/2026", "dias": 88}, {"nome": "CLAUDIVAN PINTO SANTOS", "cargo": "TECNICO HEADEND I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 21, "data_real": "20/06/2026", "data_real_iso": "2026-06-20", "data_real_str": "20/06/2026", "data_venc": "18/09/2026", "dias": 88}, {"nome": "OSEIAS DA ROCHA FERREIRA", "cargo": "ANL DATACENTER I", "status": "ATIVO", "tipo": "DEBITO", "descricao": "DEBITO BANCO DE HORAS - ATRASOS", "minutos": 40, "data_real": "22/06/2026", "data_real_iso": "2026-06-22", "data_real_str": "22/06/2026", "data_venc": "20/09/2026", "dias": 90}, {"nome": "RICARDO VAGNER STOCO JUNIOR", "cargo": "ASSIST ADMINISTRATIVO I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 32, "data_real": "22/06/2026", "data_real_iso": "2026-06-22", "data_real_str": "22/06/2026", "data_venc": "20/09/2026", "dias": 90}, {"nome": "PRISCILA FABIANA CORRALES", "cargo": "TECNICO HEADEND I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 18, "data_real": "22/06/2026", "data_real_iso": "2026-06-22", "data_real_str": "22/06/2026", "data_venc": "20/09/2026", "dias": 90}, {"nome": "RODRIGO ALVES SILVERIO", "cargo": "ANL DATACENTER I", "status": "ATIVO", "tipo": "CREDITO", "descricao": "CREDITO BANCO DE HORAS", "minutos": 14, "data_real": "22/06/2026", "data_real_iso": "2026-06-22", "data_real_str": "22/06/2026", "data_venc": "20/09/2026", "dias": 90}], "cargos": ["ANL DATACENTER I", "ANL DATACENTER II", "ANL DATACENTER III", "ASSIST ADMINISTRATIVO I", "TECNICO HEADEND I", "TECNICO HEADEND II"], "status_list": ["AFASTADO", "ATIVO"], "data_min": "23/04/2026", "data_max": "22/06/2026", "csv_text_initial": "FUNC_ID;NOME;CARGO;STATUS;DESCRICAO;DATA REALIZAÇÃO;DATA VENCIMENTO;SALDO A COMPENSAR;A_VENCER_EM_DIAS\n138040;SAMUEL RODRIGO FERREIRA INACIO DA ROCHA;TECNICO HEADEND I;AFASTADO;DEBITO BANCO DE HORAS - ATRASOS;23/04/2026;22/07/2026;00:32;30\n172689;IAGO RIBEIRO LIMA;ANL DATACENTER I;ATIVO;CREDITO BH DSR/FERIADO;01/05/2026;30/07/2026;01:08;38\n173436;ROBERT DELPASSO DIAS;TECNICO HEADEND I;ATIVO;CREDITO BH DSR/FERIADO;01/05/2026;30/07/2026;02:49;38\n172689;IAGO RIBEIRO LIMA;ANL DATACENTER I;ATIVO;CREDITO BANCO DE HORAS;05/05/2026;03/08/2026;00:20;42\n173436;ROBERT DELPASSO DIAS;TECNICO HEADEND I;ATIVO;CREDITO BANCO DE HORAS;05/05/2026;03/08/2026;00:30;42\n173436;ROBERT DELPASSO DIAS;TECNICO HEADEND I;ATIVO;CREDITO BANCO DE HORAS;06/05/2026;04/08/2026;00:14;43\n172689;IAGO RIBEIRO LIMA;ANL DATACENTER I;ATIVO;CREDITO BANCO DE HORAS;07/05/2026;05/08/2026;00:38;44\n173436;ROBERT DELPASSO DIAS;TECNICO HEADEND I;ATIVO;CREDITO BANCO DE HORAS;09/05/2026;07/08/2026;00:30;46\n172689;IAGO RIBEIRO LIMA;ANL DATACENTER I;ATIVO;CREDITO BANCO DE HORAS;12/05/2026;10/08/2026;00:13;49\n173436;ROBERT DELPASSO DIAS;TECNICO HEADEND I;ATIVO;CREDITO BANCO DE HORAS;12/05/2026;10/08/2026;00:12;49\n173436;ROBERT DELPASSO DIAS;TECNICO HEADEND I;ATIVO;CREDITO BANCO DE HORAS;13/05/2026;11/08/2026;00:21;50\n132157;CARLOS HENRIQUE SBRISSA;TECNICO HEADEND II;ATIVO;CREDITO BANCO DE HORAS;14/05/2026;12/08/2026;00:09;51\n172689;IAGO RIBEIRO LIMA;ANL DATACENTER I;ATIVO;CREDITO BANCO DE HORAS;14/05/2026;12/08/2026;00:36;51\n132157;CARLOS HENRIQUE SBRISSA;TECNICO HEADEND II;ATIVO;CREDITO BANCO DE HORAS;15/05/2026;13/08/2026;00:20;52\n172689;IAGO RIBEIRO LIMA;ANL DATACENTER I;ATIVO;CREDITO BANCO DE HORAS;15/05/2026;13/08/2026;00:22;52\n173436;ROBERT DELPASSO DIAS;TECNICO HEADEND I;ATIVO;CREDITO BANCO DE HORAS;16/05/2026;14/08/2026;00:17;53\n167741;RODRIGO ALVES SILVERIO;ANL DATACENTER I;ATIVO;CREDITO BANCO DE HORAS;17/05/2026;15/08/2026;00:29;54\n167741;RODRIGO ALVES SILVERIO;ANL DATACENTER I;ATIVO;CREDITO BANCO DE HORAS;18/05/2026;16/08/2026;00:18;55\n167741;RODRIGO ALVES SILVERIO;ANL DATACENTER I;ATIVO;CREDITO BANCO DE HORAS;19/05/2026;17/08/2026;00:19;56\n132157;CARLOS HENRIQUE SBRISSA;TECNICO HEADEND II;ATIVO;CREDITO BANCO DE HORAS;19/05/2026;17/08/2026;00:29;56\n173436;ROBERT DELPASSO DIAS;TECNICO HEADEND I;ATIVO;CREDITO BANCO DE HORAS;19/05/2026;17/08/2026;00:12;56\n172689;IAGO RIBEIRO LIMA;ANL DATACENTER I;ATIVO;CREDITO BANCO DE HORAS;20/05/2026;18/08/2026;00:17;57\n167741;RODRIGO ALVES SILVERIO;ANL DATACENTER I;ATIVO;CREDITO BANCO DE HORAS;21/05/2026;19/08/2026;00:11;58\n173436;ROBERT DELPASSO DIAS;TECNICO HEADEND I;ATIVO;CREDITO BANCO DE HORAS;21/05/2026;19/08/2026;00:22;58\n167741;RODRIGO ALVES SILVERIO;ANL DATACENTER I;ATIVO;CREDITO BANCO DE HORAS;22/05/2026;20/08/2026;00:21;59\n173436;ROBERT DELPASSO DIAS;TECNICO HEADEND I;ATIVO;CREDITO BANCO DE HORAS;22/05/2026;20/08/2026;00:17;59\n173436;ROBERT DELPASSO DIAS;TECNICO HEADEND I;ATIVO;CREDITO BH DSR/FERIADO;24/05/2026;22/08/2026;00:49;61\n176160;ISRAEL ANDRADE DE OLIVEIRA;TECNICO HEADEND I;ATIVO;CREDITO BH DSR/FERIADO;24/05/2026;22/08/2026;01:39;61\n167741;RODRIGO ALVES SILVERIO;ANL DATACENTER I;ATIVO;CREDITO BANCO DE HORAS;25/05/2026;23/08/2026;00:35;62\n132157;CARLOS HENRIQUE SBRISSA;TECNICO HEADEND II;ATIVO;CREDITO BANCO DE HORAS;25/05/2026;23/08/2026;00:50;62\n176160;ISRAEL ANDRADE DE OLIVEIRA;TECNICO HEADEND I;ATIVO;CREDITO BANCO DE HORAS;25/05/2026;23/08/2026;00:30;62\n167741;RODRIGO ALVES SILVERIO;ANL DATACENTER I;ATIVO;CREDITO BANCO DE HORAS;26/05/2026;24/08/2026;00:21;63\n173436;ROBERT DELPASSO DIAS;TECNICO HEADEND I;ATIVO;CREDITO BANCO DE HORAS;26/05/2026;24/08/2026;01:28;63\n167741;RODRIGO ALVES SILVERIO;ANL DATACENTER I;ATIVO;CREDITO BANCO DE HORAS;27/05/2026;25/08/2026;00:16;64\n132157;CARLOS HENRIQUE SBRISSA;TECNICO HEADEND II;ATIVO;CREDITO BANCO DE HORAS;27/05/2026;25/08/2026;00:26;64\n176160;ISRAEL ANDRADE DE OLIVEIRA;TECNICO HEADEND I;ATIVO;CREDITO BANCO DE HORAS;27/05/2026;25/08/2026;00:43;64\n167741;RODRIGO ALVES SILVERIO;ANL DATACENTER I;ATIVO;CREDITO BANCO DE HORAS;28/05/2026;26/08/2026;00:19;65\n172689;IAGO RIBEIRO LIMA;ANL DATACENTER I;ATIVO;CREDITO BANCO DE HORAS;28/05/2026;26/08/2026;00:55;65\n100370;VALDENIR MAZZARI;TECNICO HEADEND II;ATIVO;CREDITO BANCO DE HORAS;28/05/2026;26/08/2026;00:44;65\n126518;ALLYSONN JORGE DOS SANTOS;ANL DATACENTER II;ATIVO;CREDITO BANCO DE HORAS;28/05/2026;26/08/2026;00:16;65\n139478;ANSELMO DIOGO DE CASTRO;TECNICO HEADEND I;ATIVO;CREDITO BANCO DE HORAS;28/05/2026;26/08/2026;00:27;65\n176160;ISRAEL ANDRADE DE OLIVEIRA;TECNICO HEADEND I;ATIVO;CREDITO BANCO DE HORAS;28/05/2026;26/08/2026;00:18;65\n167741;RODRIGO ALVES SILVERIO;ANL DATACENTER I;ATIVO;CREDITO BANCO DE HORAS;29/05/2026;27/08/2026;00:14;66\n172689;IAGO RIBEIRO LIMA;ANL DATACENTER I;ATIVO;CREDITO BANCO DE HORAS;29/05/2026;27/08/2026;00:37;66\n176159;WILSON COLARES DOS SANTOS;TECNICO HEADEND I;ATIVO;CREDITO BANCO DE HORAS;29/05/2026;27/08/2026;00:09;66\n139478;ANSELMO DIOGO DE CASTRO;TECNICO HEADEND I;ATIVO;CREDITO BANCO DE HORAS;29/05/2026;27/08/2026;00:31;66\n172689;IAGO RIBEIRO LIMA;ANL DATACENTER I;ATIVO;CREDITO BANCO DE HORAS;01/06/2026;30/08/2026;00:11;69\n139478;ANSELMO DIOGO DE CASTRO;TECNICO HEADEND I;ATIVO;CREDITO BANCO DE HORAS;02/06/2026;31/08/2026;00:12;70\n167741;RODRIGO ALVES SILVERIO;ANL DATACENTER I;ATIVO;CREDITO BANCO DE HORAS;02/06/2026;31/08/2026;00:15;70\n176160;ISRAEL ANDRADE DE OLIVEIRA;TECNICO HEADEND I;ATIVO;CREDITO BANCO DE HORAS;03/06/2026;01/09/2026;00:16;71\n126518;ALLYSONN JORGE DOS SANTOS;ANL DATACENTER II;ATIVO;CREDITO BANCO DE HORAS;03/06/2026;01/09/2026;00:35;71\n132157;CARLOS HENRIQUE SBRISSA;TECNICO HEADEND II;ATIVO;CREDITO BANCO DE HORAS;03/06/2026;01/09/2026;00:52;71\n943648;SERGIO SILVA DE CAMPOS;ANL DATACENTER I;ATIVO;CREDITO BH DSR/FERIADO;04/06/2026;02/09/2026;00:55;72\n155702;RODRIGO SANCHES ASSONI;ANL DATACENTER I;ATIVO;CREDITO BH DSR/FERIADO;04/06/2026;02/09/2026;02:32;72\n112137;JOSE MARCOS GONCALVES CANEIRA;ANL DATACENTER II;ATIVO;CREDITO BH DSR/FERIADO;04/06/2026;02/09/2026;04:17;72\n165506;LUIZ EDUARDO DE FREITAS JUNIOR;TECNICO HEADEND I;ATIVO;DEBITO BANCO DE HORAS - FALTAS;05/06/2026;03/09/2026;00:36;73\n139478;ANSELMO DIOGO DE CASTRO;TECNICO HEADEND I;ATIVO;CREDITO BANCO DE HORAS;05/06/2026;03/09/2026;00:22;73\n157784;ROSELITO PEDROSA;ANL DATACENTER I;ATIVO;CREDITO BANCO DE HORAS;05/06/2026;03/09/2026;00:26;73\n155702;RODRIGO SANCHES ASSONI;ANL DATACENTER I;ATIVO;CREDITO BANCO DE HORAS;05/06/2026;03/09/2026;00:19;73\n120275;PRISCILA FABIANA CORRALES;TECNICO HEADEND I;ATIVO;CREDITO BANCO DE HORAS;05/06/2026;03/09/2026;01:26;73\n126518;ALLYSONN JORGE DOS SANTOS;ANL DATACENTER II;ATIVO;CREDITO BANCO DE HORAS;06/06/2026;04/09/2026;05:41;74\n133077;LUIZ FERNANDO MARTINS;ANL DATACENTER I;ATIVO;DEBITO BANCO DE HORAS - FALTAS;06/06/2026;04/09/2026;03:39;74\n172689;IAGO RIBEIRO LIMA;ANL DATACENTER I;ATIVO;CREDITO BANCO DE HORAS;06/06/2026;04/09/2026;00:23;74\n167741;RODRIGO ALVES SILVERIO;ANL DATACENTER I;ATIVO;CREDITO BANCO DE HORAS;07/06/2026;05/09/2026;00:17;75\n112137;JOSE MARCOS GONCALVES CANEIRA;ANL DATACENTER II;ATIVO;CREDITO BANCO DE HORAS;07/06/2026;05/09/2026;00:17;75\n100370;VALDENIR MAZZARI;TECNICO HEADEND II;ATIVO;CREDITO BANCO DE HORAS;08/06/2026;06/09/2026;00:33;76\n176160;ISRAEL ANDRADE DE OLIVEIRA;TECNICO HEADEND I;ATIVO;CREDITO BANCO DE HORAS;08/06/2026;06/09/2026;00:37;76\n132157;CARLOS HENRIQUE SBRISSA;TECNICO HEADEND II;ATIVO;CREDITO BANCO DE HORAS;08/06/2026;06/09/2026;00:32;76\n120275;PRISCILA FABIANA CORRALES;TECNICO HEADEND I;ATIVO;CREDITO BANCO DE HORAS;08/06/2026;06/09/2026;00:26;76\n167741;RODRIGO ALVES SILVERIO;ANL DATACENTER I;ATIVO;CREDITO BANCO DE HORAS;08/06/2026;06/09/2026;00:15;76\n139478;ANSELMO DIOGO DE CASTRO;TECNICO HEADEND I;ATIVO;CREDITO BANCO DE HORAS;09/06/2026;07/09/2026;00:12;77\n157784;ROSELITO PEDROSA;ANL DATACENTER I;ATIVO;CREDITO BANCO DE HORAS;09/06/2026;07/09/2026;00:38;77\n173436;ROBERT DELPASSO DIAS;TECNICO HEADEND I;ATIVO;CREDITO BANCO DE HORAS;09/06/2026;07/09/2026;00:34;77\n122723;ANDERSON PAULO ISIDORO;TECNICO HEADEND II;ATIVO;CREDITO BANCO DE HORAS;09/06/2026;07/09/2026;00:19;77\n165506;LUIZ EDUARDO DE FREITAS JUNIOR;TECNICO HEADEND I;ATIVO;DEBITO BANCO DE HORAS - ATRASOS;10/06/2026;08/09/2026;01:43;78\n100370;VALDENIR MAZZARI;TECNICO HEADEND II;ATIVO;CREDITO BANCO DE HORAS;10/06/2026;08/09/2026;00:53;78\n130416;RICARDO CASTELLAN;TECNICO HEADEND I;ATIVO;CREDITO BANCO DE HORAS;10/06/2026;08/09/2026;01:10;78\n173436;ROBERT DELPASSO DIAS;TECNICO HEADEND I;ATIVO;CREDITO BANCO DE HORAS;10/06/2026;08/09/2026;00:12;78\n132157;CARLOS HENRIQUE SBRISSA;TECNICO HEADEND II;ATIVO;CREDITO BANCO DE HORAS;10/06/2026;08/09/2026;00:37;78\n167741;RODRIGO ALVES SILVERIO;ANL DATACENTER I;ATIVO;CREDITO BANCO DE HORAS;10/06/2026;08/09/2026;00:17;78\n155702;RODRIGO SANCHES ASSONI;ANL DATACENTER I;ATIVO;CREDITO BANCO DE HORAS;11/06/2026;09/09/2026;00:21;79\n120275;PRISCILA FABIANA CORRALES;TECNICO HEADEND I;ATIVO;CREDITO BANCO DE HORAS;11/06/2026;09/09/2026;00:26;79\n165506;LUIZ EDUARDO DE FREITAS JUNIOR;TECNICO HEADEND I;ATIVO;DEBITO BANCO DE HORAS - ATRASOS;11/06/2026;09/09/2026;02:01;79\n176160;ISRAEL ANDRADE DE OLIVEIRA;TECNICO HEADEND I;ATIVO;CREDITO BANCO DE HORAS;11/06/2026;09/09/2026;00:13;79\n157784;ROSELITO PEDROSA;ANL DATACENTER I;ATIVO;CREDITO BANCO DE HORAS;11/06/2026;09/09/2026;00:39;79\n130416;RICARDO CASTELLAN;TECNICO HEADEND I;ATIVO;CREDITO BANCO DE HORAS;11/06/2026;09/09/2026;00:35;79\n165506;LUIZ EDUARDO DE FREITAS JUNIOR;TECNICO HEADEND I;ATIVO;DEBITO BANCO DE HORAS - ATRASOS;12/06/2026;10/09/2026;01:39;80\n139478;ANSELMO DIOGO DE CASTRO;TECNICO HEADEND I;ATIVO;CREDITO BANCO DE HORAS;12/06/2026;10/09/2026;00:27;80\n176160;ISRAEL ANDRADE DE OLIVEIRA;TECNICO HEADEND I;ATIVO;CREDITO BANCO DE HORAS;12/06/2026;10/09/2026;00:12;80\n157784;ROSELITO PEDROSA;ANL DATACENTER I;ATIVO;CREDITO BANCO DE HORAS;12/06/2026;10/09/2026;00:41;80\n163896;LEONARDO CARCELIM FERNANDES;TECNICO HEADEND I;ATIVO;DEBITO BANCO DE HORAS - FALTAS;12/06/2026;10/09/2026;04:29;80\n100370;VALDENIR MAZZARI;TECNICO HEADEND II;ATIVO;CREDITO BANCO DE HORAS;12/06/2026;10/09/2026;00:15;80\n943648;SERGIO SILVA DE CAMPOS;ANL DATACENTER I;ATIVO;CREDITO BANCO DE HORAS;12/06/2026;10/09/2026;00:13;80\n120209;LUCAS DE PAULA SOUZA;ANL DATACENTER III;ATIVO;DEBITO BANCO DE HORAS - ATRASOS;12/06/2026;10/09/2026;00:21;80\n132157;CARLOS HENRIQUE SBRISSA;TECNICO HEADEND II;ATIVO;CREDITO BANCO DE HORAS;12/06/2026;10/09/2026;00:14;80\n173436;ROBERT DELPASSO DIAS;TECNICO HEADEND I;ATIVO;CREDITO BANCO DE HORAS;13/06/2026;11/09/2026;00:12;81\n122723;ANDERSON PAULO ISIDORO;TECNICO HEADEND II;ATIVO;CREDITO BANCO DE HORAS;13/06/2026;11/09/2026;02:00;81\n122723;ANDERSON PAULO ISIDORO;TECNICO HEADEND II;ATIVO;CREDITO BANCO DE HORAS SUP. 2;13/06/2026;11/09/2026;00:08;81\n120209;LUCAS DE PAULA SOUZA;ANL DATACENTER III;ATIVO;DEBITO BANCO DE HORAS - ATRASOS;13/06/2026;11/09/2026;00:28;81\n167741;RODRIGO ALVES SILVERIO;ANL DATACENTER I;ATIVO;CREDITO BANCO DE HORAS;14/06/2026;12/09/2026;00:13;82\n139478;ANSELMO DIOGO DE CASTRO;TECNICO HEADEND I;ATIVO;CREDITO BANCO DE HORAS;15/06/2026;13/09/2026;00:36;83\n176160;ISRAEL ANDRADE DE OLIVEIRA;TECNICO HEADEND I;ATIVO;CREDITO BANCO DE HORAS;15/06/2026;13/09/2026;00:25;83\n943648;SERGIO SILVA DE CAMPOS;ANL DATACENTER I;ATIVO;CREDITO BANCO DE HORAS;15/06/2026;13/09/2026;00:11;83\n173436;ROBERT DELPASSO DIAS;TECNICO HEADEND I;ATIVO;CREDITO BANCO DE HORAS;15/06/2026;13/09/2026;00:12;83\n133077;LUIZ FERNANDO MARTINS;ANL DATACENTER I;ATIVO;DEBITO BANCO DE HORAS - ATRASOS;15/06/2026;13/09/2026;00:31;83\n172689;IAGO RIBEIRO LIMA;ANL DATACENTER I;ATIVO;CREDITO BANCO DE HORAS;15/06/2026;13/09/2026;00:34;83\n122723;ANDERSON PAULO ISIDORO;TECNICO HEADEND II;ATIVO;CREDITO BANCO DE HORAS;15/06/2026;13/09/2026;00:11;83\n167741;RODRIGO ALVES SILVERIO;ANL DATACENTER I;ATIVO;CREDITO BANCO DE HORAS;15/06/2026;13/09/2026;00:19;83\n176160;ISRAEL ANDRADE DE OLIVEIRA;TECNICO HEADEND I;ATIVO;CREDITO BANCO DE HORAS;16/06/2026;14/09/2026;00:38;84\n132157;CARLOS HENRIQUE SBRISSA;TECNICO HEADEND II;ATIVO;CREDITO BANCO DE HORAS;16/06/2026;14/09/2026;00:34;84\n943648;SERGIO SILVA DE CAMPOS;ANL DATACENTER I;ATIVO;CREDITO BANCO DE HORAS;17/06/2026;15/09/2026;00:11;85\n157025;OSEIAS DA ROCHA FERREIRA;ANL DATACENTER I;ATIVO;DEBITO BANCO DE HORAS - FALTAS;17/06/2026;15/09/2026;02:28;85\n908646;RICARDO VAGNER STOCO JUNIOR;ASSIST ADMINISTRATIVO I;ATIVO;CREDITO BANCO DE HORAS;17/06/2026;15/09/2026;00:24;85\n165506;LUIZ EDUARDO DE FREITAS JUNIOR;TECNICO HEADEND I;ATIVO;DEBITO BANCO DE HORAS - ATRASOS;17/06/2026;15/09/2026;00:40;85\n132157;CARLOS HENRIQUE SBRISSA;TECNICO HEADEND II;ATIVO;CREDITO BANCO DE HORAS;17/06/2026;15/09/2026;00:22;85\n155702;RODRIGO SANCHES ASSONI;ANL DATACENTER I;ATIVO;CREDITO BANCO DE HORAS;17/06/2026;15/09/2026;00:17;85\n157784;ROSELITO PEDROSA;ANL DATACENTER I;ATIVO;CREDITO BANCO DE HORAS;18/06/2026;16/09/2026;00:21;86\n163896;LEONARDO CARCELIM FERNANDES;TECNICO HEADEND I;ATIVO;DEBITO BANCO DE HORAS - ATRASOS;18/06/2026;16/09/2026;00:19;86\n100370;VALDENIR MAZZARI;TECNICO HEADEND II;ATIVO;CREDITO BANCO DE HORAS;18/06/2026;16/09/2026;00:12;86\n173436;ROBERT DELPASSO DIAS;TECNICO HEADEND I;ATIVO;CREDITO BANCO DE HORAS;18/06/2026;16/09/2026;00:13;86\n132157;CARLOS HENRIQUE SBRISSA;TECNICO HEADEND II;ATIVO;CREDITO BANCO DE HORAS;18/06/2026;16/09/2026;00:22;86\n176160;ISRAEL ANDRADE DE OLIVEIRA;TECNICO HEADEND I;ATIVO;CREDITO BANCO DE HORAS;19/06/2026;17/09/2026;00:37;87\n157784;ROSELITO PEDROSA;ANL DATACENTER I;ATIVO;CREDITO BANCO DE HORAS;19/06/2026;17/09/2026;00:47;87\n126518;ALLYSONN JORGE DOS SANTOS;ANL DATACENTER II;ATIVO;CREDITO BANCO DE HORAS;19/06/2026;17/09/2026;01:08;87\n173436;ROBERT DELPASSO DIAS;TECNICO HEADEND I;ATIVO;CREDITO BANCO DE HORAS;19/06/2026;17/09/2026;00:12;87\n175595;MARCOS VINICIOS NOGUEIRA DE SOUZA;ANL DATACENTER II;ATIVO;CREDITO BH DSR/FERIADO;19/06/2026;17/09/2026;06:12;87\n171617;CLAUDIVAN PINTO SANTOS;TECNICO HEADEND I;ATIVO;CREDITO BH DSR/FERIADO;19/06/2026;17/09/2026;06:48;87\n133695;RAFAEL DEIVE PUTTI;TECNICO HEADEND I;ATIVO;CREDITO BH DSR/FERIADO;19/06/2026;17/09/2026;07:02;87\n152542;BRUNO CARLOS SALGADO DIAS;ANL DATACENTER I;ATIVO;DEBITO BANCO DE HORAS - FALTAS;20/06/2026;18/09/2026;00:07;88\n171617;CLAUDIVAN PINTO SANTOS;TECNICO HEADEND I;ATIVO;CREDITO BANCO DE HORAS;20/06/2026;18/09/2026;00:21;88\n157025;OSEIAS DA ROCHA FERREIRA;ANL DATACENTER I;ATIVO;DEBITO BANCO DE HORAS - ATRASOS;22/06/2026;20/09/2026;00:40;90\n908646;RICARDO VAGNER STOCO JUNIOR;ASSIST ADMINISTRATIVO I;ATIVO;CREDITO BANCO DE HORAS;22/06/2026;20/09/2026;00:32;90\n120275;PRISCILA FABIANA CORRALES;TECNICO HEADEND I;ATIVO;CREDITO BANCO DE HORAS;22/06/2026;20/09/2026;00:18;90\n167741;RODRIGO ALVES SILVERIO;ANL DATACENTER I;ATIVO;CREDITO BANCO DE HORAS;22/06/2026;20/09/2026;00:14;90\n", "filename_initial": "rhtk1144_130841 (14).csv"};
+let RECORDS = INITIAL.records;
+let CARGOS = INITIAL.cargos;
+let STATUS_LIST = INITIAL.status_list;
+let filters = { tipo:'TODOS', status:'TODOS', cargo:'TODOS' };
+let charts = {};
+const dPalette = ['#0070d1','#2e7d32','#c62828','#f9a825','#6a1b9a','#00897b','#5d4037','#455a64','#d81b60'];
+
+function formatHM(min){
+  const sign = min < 0 ? "-" : "";
+  min = Math.abs(Math.round(min));
+  const h = Math.floor(min/60), m = min % 60;
+  return sign + String(h).padStart(2,'0') + ":" + String(m).padStart(2,'0');
+}
+
+// ============ TOAST ============
+function showToast(msg, type){
+  type = type || 'info';
+  const c = document.getElementById('toastContainer');
+  const t = document.createElement('div');
+  t.className = 'toast ' + type;
+  t.textContent = msg;
+  c.appendChild(t);
+  setTimeout(()=>t.classList.add('show'), 10);
+  setTimeout(()=>{
+    t.classList.remove('show');
+    setTimeout(()=>t.remove(), 300);
+  }, 3500);
+}
+
+// ============ INDEXEDDB ============
+const DB_NAME = 'BancoHorasDB';
+const DB_STORE = 'arquivos';
+
+function openDB(){
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, 1);
+    req.onupgradeneeded = (e) => {
+      const db = e.target.result;
+      if(!db.objectStoreNames.contains(DB_STORE)){
+        const store = db.createObjectStore(DB_STORE, { keyPath:'id', autoIncrement:true });
+        store.createIndex('uploadedAt','uploadedAt',{unique:false});
+      }
+    };
+    req.onsuccess = (e) => resolve(e.target.result);
+    req.onerror = (e) => reject(e.target.error);
+  });
+}
+
+async function saveToHistory(filename, content, recordsCount, colabsCount, pMin, pMax){
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(DB_STORE, 'readwrite');
+    const store = tx.objectStore(DB_STORE);
+    const data = {
+      filename, content,
+      uploadedAt: new Date().toISOString(),
+      records_count: recordsCount,
+      colaboradores: colabsCount,
+      periodo_min: pMin, periodo_max: pMax
+    };
+    const req = store.add(data);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function listHistory(){
+  const db = await openDB();
+  return new Promise((resolve) => {
+    const tx = db.transaction(DB_STORE, 'readonly');
+    const store = tx.objectStore(DB_STORE);
+    const req = store.getAll();
+    req.onsuccess = () => {
+      const items = req.result || [];
+      items.sort((a,b) => (b.uploadedAt||'').localeCompare(a.uploadedAt||''));
+      resolve(items);
+    };
+    req.onerror = () => resolve([]);
+  });
+}
+
+async function loadHistoryItem(id){
+  const db = await openDB();
+  return new Promise((resolve) => {
+    const tx = db.transaction(DB_STORE, 'readonly');
+    const req = tx.objectStore(DB_STORE).get(id);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => resolve(null);
+  });
+}
+
+async function deleteHistoryItem(id){
+  const db = await openDB();
+  return new Promise((resolve) => {
+    const tx = db.transaction(DB_STORE, 'readwrite');
+    tx.objectStore(DB_STORE).delete(id);
+    tx.oncomplete = () => resolve(true);
+  });
+}
+
+async function clearHistory(){
+  const db = await openDB();
+  return new Promise((resolve) => {
+    const tx = db.transaction(DB_STORE, 'readwrite');
+    tx.objectStore(DB_STORE).clear();
+    tx.oncomplete = () => resolve(true);
+  });
+}
+
+function downloadCsv(filename, content){
+  const blob = new Blob([content], {type:'text/csv;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(url), 1000);
+}
+
+function toggleHistory(){
+  const tog = document.getElementById('historyToggle');
+  const c = document.getElementById('historyContent');
+  tog.classList.toggle('open');
+  c.classList.toggle('open');
+}
+
+async function refreshHistoryUI(){
+  const items = await listHistory();
+  document.getElementById('historyCount').textContent = items.length;
+  const tbody = document.getElementById('historyTbody');
+  tbody.innerHTML = '';
+  if(items.length === 0){
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:#888; padding:12px;">Nenhum arquivo no histórico</td></tr>';
+    return;
+  }
+  items.forEach((item, i) => {
+    const dt = new Date(item.uploadedAt);
+    const dtStr = dt.toLocaleString('pt-BR');
+    const periodo = (item.periodo_min && item.periodo_max) ? `${item.periodo_min} a ${item.periodo_max}` : '—';
+    tbody.insertAdjacentHTML('beforeend', `
+      <tr>
+        <td>${i+1}</td>
+        <td><b>${item.filename}</b></td>
+        <td>${dtStr}</td>
+        <td>${periodo}</td>
+        <td class="num">${item.records_count || 0}</td>
+        <td class="num">${item.colaboradores || 0}</td>
+        <td>
+          <button class="btn-history load" onclick="loadFromHistory(${item.id})">🔄 Carregar</button>
+          <button class="btn-history download" onclick="downloadFromHistory(${item.id})">⬇️ Baixar</button>
+          <button class="btn-history delete" onclick="removeFromHistory(${item.id})">🗑️</button>
+        </td>
+      </tr>
+    `);
+  });
+}
+
+async function loadFromHistory(id){
+  const item = await loadHistoryItem(id);
+  if(!item) { showToast('Item não encontrado','error'); return; }
+  try {
+    processCsvText(item.content, item.filename, false);
+    showToast(`✅ Versão "${item.filename}" carregada com sucesso!`,'success');
+  } catch(err){
+    showToast('❌ Erro: ' + err.message, 'error');
+  }
+}
+
+async function downloadFromHistory(id){
+  const item = await loadHistoryItem(id);
+  if(!item) return;
+  downloadCsv(item.filename, item.content);
+  showToast(`⬇️ Download iniciado: ${item.filename}`, 'info');
+}
+
+async function removeFromHistory(id){
+  if(!confirm('Excluir esta versão do histórico?')) return;
+  await deleteHistoryItem(id);
+  await refreshHistoryUI();
+  showToast('🗑️ Versão excluída do histórico', 'info');
+}
+
+async function confirmClearHistory(){
+  if(!confirm('Tem certeza? Isso apagará TODOS os arquivos do histórico no navegador.')) return;
+  await clearHistory();
+  await refreshHistoryUI();
+  showToast('🧹 Histórico limpo', 'info');
+}
+
+// ============ CSV PARSER ============
+function hmToMin(s){
+  if(!s || s.indexOf(':') < 0) return 0;
+  const p = s.trim().split(':');
+  if(p.length !== 2) return 0;
+  const h = parseInt(p[0],10), m = parseInt(p[1],10);
+  if(isNaN(h)||isNaN(m)) return 0;
+  return h*60 + m;
+}
+
+function dmyToIso(s){
+  if(!s) return '';
+  const p = s.trim().split('/');
+  if(p.length !== 3) return '';
+  return p[2] + '-' + p[1].padStart(2,'0') + '-' + p[0].padStart(2,'0');
+}
+
+function parseCsvText(text){
+  // remove BOM
+  text = text.replace(/^\uFEFF/,'');
+  const lines = text.split(/\r?\n/);
+  let headerIdx = -1;
+  for(let i=0;i<lines.length;i++){
+    if(lines[i].toUpperCase().indexOf('FUNC_ID') >= 0){ headerIdx = i; break; }
+  }
+  if(headerIdx < 0) throw new Error('Cabeçalho FUNC_ID não encontrado no arquivo.');
+
+  const headers = lines[headerIdx].split(';').map(h => h.trim());
+  const idx = {
+    nome: headers.findIndex(h => h.toUpperCase()==='NOME'),
+    cargo: headers.findIndex(h => h.toUpperCase()==='CARGO'),
+    status: headers.findIndex(h => h.toUpperCase()==='STATUS'),
+    descricao: headers.findIndex(h => h.toUpperCase()==='DESCRICAO'),
+    dataReal: headers.findIndex(h => h.toUpperCase().indexOf('DATA REALIZA')>=0),
+    dataVenc: headers.findIndex(h => h.toUpperCase().indexOf('DATA VENCIMENTO')>=0),
+    saldo: headers.findIndex(h => h.toUpperCase().indexOf('SALDO A COMPENSAR')>=0),
+    dias: headers.findIndex(h => h.toUpperCase().indexOf('A_VENCER')>=0)
+  };
+  if(idx.nome<0 || idx.saldo<0 || idx.descricao<0) throw new Error('Colunas obrigatórias ausentes (NOME, DESCRICAO, SALDO).');
+
+  const records = [];
+  for(let i=headerIdx+1; i<lines.length; i++){
+    const line = lines[i].trim();
+    if(!line) continue;
+    const parts = line.split(';');
+    if(parts.length < 5) continue;
+    const desc = (parts[idx.descricao]||'').toUpperCase().trim();
+    let tipo = 'OUTRO';
+    if(desc.startsWith('CREDITO')) tipo = 'CREDITO';
+    else if(desc.startsWith('DEBITO')) tipo = 'DEBITO';
+    const dr = (parts[idx.dataReal]||'').trim();
+    records.push({
+      nome: (parts[idx.nome]||'').trim(),
+      cargo: (parts[idx.cargo]||'').trim(),
+      status: (parts[idx.status]||'').trim(),
+      tipo: tipo,
+      descricao: (parts[idx.descricao]||'').trim(),
+      minutos: hmToMin(parts[idx.saldo]),
+      data_real: dr,
+      data_real_iso: dmyToIso(dr),
+      data_real_str: dr,
+      data_venc: (parts[idx.dataVenc]||'').trim(),
+      dias: parseInt(parts[idx.dias]||'9999',10) || 9999
+    });
+  }
+
+  const cargos = [...new Set(records.map(r=>r.cargo).filter(c=>c))].sort();
+  const status_list = [...new Set(records.map(r=>r.status).filter(c=>c))].sort();
+  const isoDates = records.map(r=>r.data_real_iso).filter(d=>d).sort();
+  const data_min_iso = isoDates[0];
+  const data_max_iso = isoDates[isoDates.length-1];
+  const isoToDmy = (iso) => iso ? iso.substring(8,10)+'/'+iso.substring(5,7)+'/'+iso.substring(0,4) : '';
+  return {
+    records, cargos, status_list,
+    data_min: isoToDmy(data_min_iso),
+    data_max: isoToDmy(data_max_iso)
+  };
+}
+
+function processCsvText(text, filename, saveHistory){
+  const parsed = parseCsvText(text);
+  RECORDS = parsed.records;
+  CARGOS = parsed.cargos;
+  STATUS_LIST = parsed.status_list;
+
+  // Atualizar filtros dinâmicos
+  filters = { tipo:'TODOS', status:'TODOS', cargo:'TODOS' };
+  rebuildAllFilters();
+
+  document.getElementById('periodo').textContent = parsed.data_min + ' a ' + parsed.data_max;
+  document.getElementById('gerEm').textContent = new Date().toLocaleString('pt-BR');
+  document.getElementById('currentFile').textContent = filename;
+
+  applyFilters();
+
+  if(saveHistory){
+    const colabs = new Set(RECORDS.map(r=>r.nome)).size;
+    saveToHistory(filename, text, RECORDS.length, colabs, parsed.data_min, parsed.data_max)
+      .then(()=>refreshHistoryUI());
+  }
+}
+
+// ============ FILTROS ============
+function buildButtons(containerId, key, options){
+  const c = document.getElementById(containerId);
+  c.innerHTML = '';
+  options.forEach(opt => {
+    const btn = document.createElement('button');
+    btn.className = 'btn-filter' + (filters[key]===opt.value ? ' active' : '');
+    btn.textContent = opt.label;
+    btn.dataset.value = opt.value;
+    btn.onclick = () => {
+      filters[key] = opt.value;
+      [...c.children].forEach(b => b.classList.toggle('active', b.dataset.value === opt.value));
+      applyFilters();
+    };
+    c.appendChild(btn);
+  });
+}
+
+function rebuildAllFilters(){
+  buildButtons('filterTipo', 'tipo', [
+    {label:'Todos', value:'TODOS'},
+    {label:'🟢 Créditos', value:'CREDITO'},
+    {label:'🔴 Débitos', value:'DEBITO'}
+  ]);
+  buildButtons('filterStatus', 'status', [
+    {label:'Todos', value:'TODOS'},
+    ...STATUS_LIST.map(s => ({label:s, value:s}))
+  ]);
+  buildButtons('filterCargo', 'cargo', [
+    {label:'Todos', value:'TODOS'},
+    ...CARGOS.map(c => ({label:c, value:c}))
+  ]);
+}
+
+function clearFilters(){
+  filters = { tipo:'TODOS', status:'TODOS', cargo:'TODOS', colaborador:'TODOS' };
+  document.querySelectorAll('.btn-filter').forEach(b => {
+    b.classList.toggle('active', b.dataset.value === 'TODOS');
+  });
+  const selectColab = document.getElementById('filtro-colaborador');
+  if (selectColab) selectColab.value = 'TODOS';
+  applyFilters();
+}
+
+
+function filterRecords(){
+  return RECORDS.filter(r => {
+    if(filters.tipo !== 'TODOS' && r.tipo !== filters.tipo) return false;
+    if(filters.status !== 'TODOS' && r.status !== filters.status) return false;
+    if(filters.cargo !== 'TODOS' && r.cargo !== filters.cargo) return false;
+    if(filters.colaborador && filters.colaborador !== 'TODOS' && r.nome !== filters.colaborador) return false;
+    return true;
+  });
+}
+
+
+function computeAggregates(recs){
+  const colabMap = {};
+  recs.forEach(r => {
+    if(!colabMap[r.nome]) colabMap[r.nome] = {NOME:r.nome, CARGO:r.cargo, STATUS:r.status, CREDITOS_MIN:0, DEBITOS_MIN:0, QTD:0};
+    if(r.tipo === 'CREDITO') colabMap[r.nome].CREDITOS_MIN += r.minutos;
+    else if(r.tipo === 'DEBITO') colabMap[r.nome].DEBITOS_MIN += r.minutos;
+    colabMap[r.nome].QTD++;
+  });
+  const colaboradores = Object.values(colabMap).map(c => ({...c, SALDO_MIN: c.CREDITOS_MIN - c.DEBITOS_MIN}));
+
+  let totCred=0, totDeb=0;
+  recs.forEach(r => {
+    if(r.tipo==='CREDITO') totCred += r.minutos;
+    else if(r.tipo==='DEBITO') totDeb += r.minutos;
+  });
+
+  const dailyMap = {};
+  recs.forEach(r => {
+    const k = r.data_real_iso || r.data_real;
+    if(!dailyMap[k]) dailyMap[k] = {data_iso:r.data_real_iso, data:r.data_real_str, credito:0, debito:0};
+    if(r.tipo==='CREDITO') dailyMap[k].credito += r.minutos;
+    else if(r.tipo==='DEBITO') dailyMap[k].debito += r.minutos;
+  });
+  const diario = Object.values(dailyMap).sort((a,b)=> (a.data_iso||'') > (b.data_iso||'') ? 1 : -1);
+
+  const distMap = {};
+  recs.forEach(r => { distMap[r.descricao] = (distMap[r.descricao]||0) + r.minutos; });
+  const distribuicao = Object.entries(distMap).map(([d,m])=>({descricao:d, minutos:m})).sort((a,b)=>b.minutos-a.minutos);
+
+  const cred = recs.filter(r=>r.tipo==='CREDITO').sort((a,b)=>a.dias-b.dias);
+  const deb  = recs.filter(r=>r.tipo==='DEBITO').sort((a,b)=>a.dias-b.dias);
+
+  return {
+    colaboradores, diario, distribuicao,
+    totais: { creditos: totCred, debitos: totDeb, saldo: totCred-totDeb,
+              colaboradores: colaboradores.length, lancamentos: recs.length },
+    mais_prox_cred: cred[0] || null,
+    mais_prox_deb:  deb[0]  || null,
+    top_cred: cred.slice(0,15),
+    top_deb:  deb.slice(0,15)
+  };
+}
+
+function renderKPIs(t){
+  const saldoCls = t.saldo >= 0 ? 'saldo-pos' : 'saldo-neg';
+  document.getElementById('kpis').innerHTML = `
+    <div class="kpi cred"><div class="label">Total Créditos</div><div class="value">${formatHM(t.creditos)}</div></div>
+    <div class="kpi deb"><div class="label">Total Débitos</div><div class="value">${formatHM(t.debitos)}</div></div>
+    <div class="kpi ${saldoCls}"><div class="label">Saldo Líquido</div><div class="value">${formatHM(t.saldo)}</div></div>
+    <div class="kpi"><div class="label">Colaboradores</div><div class="value">${t.colaboradores}</div></div>
+    <div class="kpi"><div class="label">Lançamentos</div><div class="value">${t.lancamentos}</div></div>
+  `;
+}
+
+function alertCard(item, tipo){
+  if(!item) return `<div class="alert-card ${tipo}"><div class="tag">${tipo==='cred'?'🟢 Crédito':'🔴 Débito'} mais próximo do vencimento</div><div class="name">Nenhum lançamento</div></div>`;
+  const titulo = tipo==='cred' ? '🟢 Crédito mais próximo do vencimento' : '🔴 Débito mais próximo do vencimento';
+  return `
+    <div class="alert-card ${tipo}">
+      <div class="days">⏱️ ${item.dias} dias</div>
+      <div class="tag">${titulo}</div>
+      <div class="name">${item.nome}</div>
+      <div class="cargo">${item.cargo} &nbsp;•&nbsp; ${item.status}</div>
+      <div class="row">
+        <div><b>Valor</b><div class="val">${formatHM(item.minutos)}</div></div>
+        <div><b>Realização</b><div class="val">${item.data_real}</div></div>
+        <div><b>Vencimento</b><div class="val">${item.data_venc}</div></div>
+      </div>
+      <div style="margin-top:10px; font-size:12px; opacity:0.9;">${item.descricao}</div>
+    </div>
+  `;
+}
+
+function fillTopTable(tblId, items){
+  const tbody = document.querySelector('#'+tblId+' tbody');
+  tbody.innerHTML = '';
+  if(items.length === 0){
+    // Como adicionamos uma coluna, mudamos o colspan de 5 para 6
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#888;">Sem lançamentos</td></tr>';
+    return;
+  }
+  items.forEach(c => {
+    tbody.insertAdjacentHTML('beforeend', `
+      <tr>
+        <td>${c.nome}</td>
+        <td>${c.cargo}</td>
+        <td style="color: #64748b; font-size: 11px;">${c.data_real || '—'}</td> <!-- NOVA COLUNA DE DATA REALIZAÇÃO -->
+        <td class="num">${formatHM(c.minutos)}</td>
+        <td>${c.data_venc}</td>
+        <td class="num"><b>${c.dias}</b></td>
+      </tr>
+    `);
+  });
+}
+
+
+function fillDetailTable(colabSorted){
+  const tbody = document.querySelector('#tbl tbody');
+  tbody.innerHTML = '';
+  if(colabSorted.length === 0){
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; color:#888;">Nenhum colaborador com os filtros atuais</td></tr>';
+    return;
+  }
+  colabSorted.forEach((c, i) => {
+    const cls = c.SALDO_MIN > 0 ? 'pos' : (c.SALDO_MIN < 0 ? 'neg' : '');
+    tbody.insertAdjacentHTML('beforeend', `
+      <tr class="${cls}">
+        <td>${i+1}</td><td>${c.NOME}</td><td>${c.CARGO || ''}</td><td>${c.STATUS || ''}</td>
+        <td class="num">${formatHM(c.CREDITOS_MIN)}</td>
+        <td class="num">${formatHM(c.DEBITOS_MIN)}</td>
+        <td class="num"><b>${formatHM(c.SALDO_MIN)}</b></td>
+        <td class="num">${c.QTD}</td>
+      </tr>
+    `);
+  });
+}
+
+function createCharts(agg){
+  const colabSorted = [...agg.colaboradores].sort((a,b)=>b.SALDO_MIN - a.SALDO_MIN);
+  const volSorted = [...agg.colaboradores].map(c=>({...c, vol: c.CREDITOS_MIN + c.DEBITOS_MIN}))
+                                          .sort((a,b)=>b.vol - a.vol).slice(0,15);
+
+  charts.saldo = new Chart(document.getElementById('chartSaldo'), {
+    type:'bar',
+    data:{ labels: colabSorted.map(c=>c.NOME),
+      datasets:[{
+        label:'Saldo (horas)',
+        data: colabSorted.map(c=> +(c.SALDO_MIN/60).toFixed(2)),
+        rawMin: colabSorted.map(c=>c.SALDO_MIN),
+        backgroundColor: colabSorted.map(c=> c.SALDO_MIN>=0 ? 'rgba(46,125,50,0.85)' : 'rgba(198,40,40,0.85)'),
+        borderColor: colabSorted.map(c=> c.SALDO_MIN>=0 ? '#2e7d32' : '#c62828'),
+        borderWidth:1
+      }] },
+    options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false,
+      layout:{padding:{right:60}},
+      plugins:{ legend:{display:false},
+        tooltip:{ callbacks:{ label:(ctx)=>'Saldo: '+formatHM(ctx.dataset.rawMin[ctx.dataIndex]) } },
+        datalabels:{ anchor:'end', align:'right', clamp:true, color:'#1a2a44',
+          font:{size:11, weight:'bold'},
+          formatter:(v, ctx)=> formatHM(ctx.dataset.rawMin[ctx.dataIndex]) } },
+      scales:{ x:{ title:{display:true,text:'Horas'}, grid:{color:'#eef'} }, y:{ ticks:{font:{size:11}} } } }
+  });
+
+  charts.cd = new Chart(document.getElementById('chartCD'), {
+    type:'bar',
+    data:{ labels: volSorted.map(c=>c.NOME),
+      datasets:[
+        { label:'Créditos (h)', data: volSorted.map(c=> +(c.CREDITOS_MIN/60).toFixed(2)),
+          rawMin: volSorted.map(c=>c.CREDITOS_MIN), backgroundColor:'rgba(46,125,50,0.85)' },
+        { label:'Débitos (h)', data: volSorted.map(c=> +(c.DEBITOS_MIN/60).toFixed(2)),
+          rawMin: volSorted.map(c=>c.DEBITOS_MIN), backgroundColor:'rgba(198,40,40,0.85)' }
+      ] },
+    options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false,
+      layout:{padding:{right:50}},
+      plugins:{ legend:{position:'top'},
+        tooltip:{ callbacks:{ label:(ctx)=> ctx.dataset.label + ': ' + formatHM(ctx.dataset.rawMin[ctx.dataIndex]) } },
+        datalabels:{ anchor:'end', align:'right', clamp:true, color:'#1a2a44',
+          font:{size:10, weight:'bold'},
+          formatter:(v, ctx)=> ctx.dataset.rawMin[ctx.dataIndex] > 0 ? formatHM(ctx.dataset.rawMin[ctx.dataIndex]) : '' } },
+      scales:{ x:{ title:{display:true,text:'Horas'} }, y:{ ticks:{font:{size:11}} } } }
+  });
+
+  charts.dist = new Chart(document.getElementById('chartDist'), {
+    type:'doughnut',
+    data:{ labels: agg.distribuicao.map(d=>d.descricao),
+      datasets:[{
+        data: agg.distribuicao.map(d=> +(d.minutos/60).toFixed(2)),
+        rawMin: agg.distribuicao.map(d=>d.minutos),
+        backgroundColor: agg.distribuicao.map((_,i)=> dPalette[i % dPalette.length])
+      }] },
+    options:{ responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{position:'bottom', labels:{font:{size:11}}},
+        tooltip:{ callbacks:{ label:(ctx)=> ctx.label + ': ' + formatHM(ctx.dataset.rawMin[ctx.dataIndex]) } },
+        datalabels:{ color:'#fff', font:{size:11, weight:'bold'},
+          formatter:(v, ctx)=> {
+            const raw = ctx.dataset.rawMin[ctx.dataIndex];
+            const tot = ctx.dataset.rawMin.reduce((a,b)=>a+b,0);
+            const pct = tot ? (raw/tot*100) : 0;
+            return pct >= 5 ? formatHM(raw) : '';
+          } } } }
+  });
+
+  charts.daily = new Chart(document.getElementById('chartDaily'), {
+    type:'line',
+    data:{ labels: agg.diario.map(d=>d.data),
+      datasets:[
+        { label:'Créditos (h)', data: agg.diario.map(d=> +(d.credito/60).toFixed(2)),
+          rawMin: agg.diario.map(d=>d.credito),
+          borderColor:'#2e7d32', backgroundColor:'rgba(46,125,50,0.2)', tension:0.3, fill:true },
+        { label:'Débitos (h)', data: agg.diario.map(d=> +(d.debito/60).toFixed(2)),
+          rawMin: agg.diario.map(d=>d.debito),
+          borderColor:'#c62828', backgroundColor:'rgba(198,40,40,0.2)', tension:0.3, fill:true }
+      ] },
+    options:{ responsive:true, maintainAspectRatio:false,
+      interaction:{mode:'index', intersect:false},
+      plugins:{ legend:{position:'top'},
+        tooltip:{ callbacks:{ label:(ctx)=> ctx.dataset.label + ': ' + formatHM(ctx.dataset.rawMin[ctx.dataIndex]) } },
+        datalabels:{display:false} },
+      scales:{ y:{ title:{display:true,text:'Horas'}, beginAtZero:true } } }
+  });
+}
+
+function updateCharts(agg){
+  const colabSorted = [...agg.colaboradores].sort((a,b)=>b.SALDO_MIN - a.SALDO_MIN);
+  const volSorted = [...agg.colaboradores].map(c=>({...c, vol: c.CREDITOS_MIN + c.DEBITOS_MIN}))
+                                          .sort((a,b)=>b.vol - a.vol).slice(0,15);
+  charts.saldo.data.labels = colabSorted.map(c=>c.NOME);
+  charts.saldo.data.datasets[0].data = colabSorted.map(c=> +(c.SALDO_MIN/60).toFixed(2));
+  charts.saldo.data.datasets[0].rawMin = colabSorted.map(c=>c.SALDO_MIN);
+  charts.saldo.data.datasets[0].backgroundColor = colabSorted.map(c=> c.SALDO_MIN>=0 ? 'rgba(46,125,50,0.85)' : 'rgba(198,40,40,0.85)');
+  charts.saldo.data.datasets[0].borderColor = colabSorted.map(c=> c.SALDO_MIN>=0 ? '#2e7d32' : '#c62828');
+  charts.saldo.update();
+
+  charts.cd.data.labels = volSorted.map(c=>c.NOME);
+  charts.cd.data.datasets[0].data = volSorted.map(c=> +(c.CREDITOS_MIN/60).toFixed(2));
+  charts.cd.data.datasets[0].rawMin = volSorted.map(c=>c.CREDITOS_MIN);
+  charts.cd.data.datasets[1].data = volSorted.map(c=> +(c.DEBITOS_MIN/60).toFixed(2));
+  charts.cd.data.datasets[1].rawMin = volSorted.map(c=>c.DEBITOS_MIN);
+  charts.cd.update();
+
+  charts.dist.data.labels = agg.distribuicao.map(d=>d.descricao);
+  charts.dist.data.datasets[0].data = agg.distribuicao.map(d=> +(d.minutos/60).toFixed(2));
+  charts.dist.data.datasets[0].rawMin = agg.distribuicao.map(d=>d.minutos);
+  charts.dist.data.datasets[0].backgroundColor = agg.distribuicao.map((_,i)=> dPalette[i % dPalette.length]);
+  charts.dist.update();
+
+  charts.daily.data.labels = agg.diario.map(d=>d.data);
+  charts.daily.data.datasets[0].data = agg.diario.map(d=> +(d.credito/60).toFixed(2));
+  charts.daily.data.datasets[0].rawMin = agg.diario.map(d=>d.credito);
+  charts.daily.data.datasets[1].data = agg.diario.map(d=> +(d.debito/60).toFixed(2));
+  charts.daily.data.datasets[1].rawMin = agg.diario.map(d=>d.debito);
+  charts.daily.update();
+}
+
+function updateFilterInfo(nRecs){
+  const parts = [];
+  if(filters.tipo !== 'TODOS') parts.push('Tipo: ' + filters.tipo);
+  if(filters.status !== 'TODOS') parts.push('Status: ' + filters.status);
+  if(filters.cargo !== 'TODOS') parts.push('Cargo: ' + filters.cargo);
+  const msg = parts.length ? '🔍 Filtros ativos: ' + parts.join(' | ') + ` — ${nRecs} lançamentos` : `📊 Mostrando todos os ${nRecs} lançamentos`;
+  document.getElementById('filterInfo').textContent = msg;
+}
+
+function applyFilters(){
+  const recs = filterRecords();
+  const agg = computeAggregates(recs);
+  renderKPIs(agg.totais);
+  document.getElementById('alertCred').innerHTML = alertCard(agg.mais_prox_cred, 'cred');
+  document.getElementById('alertDeb').innerHTML  = alertCard(agg.mais_prox_deb,  'deb');
+  fillTopTable('tblCred', agg.top_cred);
+  fillTopTable('tblDeb',  agg.top_deb);
+  const colabSorted = [...agg.colaboradores].sort((a,b)=>b.SALDO_MIN - a.SALDO_MIN);
+  fillDetailTable(colabSorted);
+  if(charts.saldo) updateCharts(agg);
+  else createCharts(agg);
+  updateFilterInfo(recs.length);
+}
+
+// ============ Upload de arquivo ============
+document.getElementById('fileInput').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    let text = ev.target.result;
+    // Detectar se há caracteres estranhos (encoding errado) → tentar latin-1
+    if(text.indexOf('Ã') >= 0 && text.indexOf('REALIZAÇÃO')<0){
+      // Releitura em latin-1
+      const reader2 = new FileReader();
+      reader2.onload = (ev2) => {
+        try { processCsvText(ev2.target.result, file.name, true);
+          showToast(`✅ "${file.name}" carregado (${file.size} bytes)`, 'success');
+        } catch(err){ showToast('❌ Erro: ' + err.message,'error'); }
+      };
+      reader2.readAsText(file, 'iso-8859-1');
+      return;
+    }
+    try {
+      processCsvText(text, file.name, true);
+      showToast(`✅ "${file.name}" carregado e adicionado ao histórico`, 'success');
+    } catch(err){
+      showToast('❌ Erro ao processar: ' + err.message, 'error');
+    }
+  };
+  reader.onerror = () => showToast('❌ Erro ao ler o arquivo','error');
+  reader.readAsText(file, 'utf-8');
+  e.target.value = ''; // reset
+});
+
+// ============ INIT ============
+async function init(){
+  rebuildAllFilters();
+  applyFilters();
+
+  try {
+    const items = await listHistory();
+    if(items.length === 0 && INITIAL.csv_text_initial){
+      // Salvar o arquivo inicial no histórico
+      const colabs = new Set(INITIAL.records.map(r=>r.nome)).size;
+      await saveToHistory(INITIAL.filename_initial, INITIAL.csv_text_initial,
+                          INITIAL.records.length, colabs,
+                          INITIAL.data_min, INITIAL.data_max);
+    }
+    await refreshHistoryUI();
+  } catch(err){
+    console.error('Erro IndexedDB:', err);
+    showToast('⚠️ Histórico indisponível: ' + err.message, 'error');
+  }
+}
+init();
+
+
+
+
+// 1. Função chamada sempre que o usuário muda o nome no Select da tela
+function filtrarPorColaborador() {
+  if (typeof filters === 'undefined') filters = {};
+  filters.colaborador = document.getElementById('filtro-colaborador').value;
+  applyFilters();
+}
+
+// 2. Monta a lista de nomes dinamicamente baseada nos registros ativos
+function atualizarFiltroDeNomes() {
+  const select = document.getElementById('filtro-colaborador');
+  if (!select || typeof RECORDS === 'undefined' || !RECORDS || RECORDS.length === 0) return;
+  
+  // Salva o nome que já estava selecionado para não perder a seleção ao recarregar
+  const valorAtual = select.value || 'TODOS';
+  
+  select.innerHTML = '<option value="TODOS">TODOS</option>';
+  
+  // Extrai os nomes do campo 'nome', remove duplicados e ordena de A a Z
+  const nomesUnicos = [...new Set(RECORDS.map(item => item.nome))].sort();
+  
+  nomesUnicos.forEach(nome => {
+    if (nome) {
+      const option = document.createElement('option');
+      option.value = nome;
+      option.textContent = nome.toUpperCase();
+      select.appendChild(option);
+    }
+  });
+  
+  // Restaura o valor selecionado
+  select.value = valorAtual;
+}
+
+// 3. Força a atualização contínua e intercepta a carga do sistema
+setInterval(() => {
+  const select = document.getElementById('filtro-colaborador');
+  // Se o select só tem a opção TODOS mas a variável RECORDS já tem dados, popula ele
+  if (select && select.options.length <= 1 && typeof RECORDS !== 'undefined' && RECORDS.length > 0) {
+    atualizarFiltroDeNomes();
+  }
+}, 500);
+
+// Intercepta a função applyFilters para garantir que se novos dados entrarem (via CSV), a lista atualize
+const originalApplyFilters = applyFilters;
+applyFilters = function() {
+  atualizarFiltroDeNomes();
+  if (typeof originalApplyFilters === 'function') {
+    originalApplyFilters();
+  }
+};
+
+
+
+
+// ==========================================
+// LÓGICA DO FILTRO DE COLABORADOR
+// ==========================================
+
+// 1. Função chamada sempre que o usuário muda o nome no Select da tela
+function filtrarPorColaborador() {
+  if (typeof filters === 'undefined') filters = {};
+  filters.colaborador = document.getElementById('filtro-colaborador').value;
+  
+  // Executa a re-renderização usando a lógica nativa do sistema
+  if (typeof applyFiltersBase === 'function') {
+    applyFiltersBase();
+  } else if (typeof filterRecords === 'function') {
+    applyFilters();
+  }
+}
+
+// 2. Monta a lista de nomes dinamicamente baseada nos registros ativos
+function atualizarFiltroDeNomes() {
+  const select = document.getElementById('filtro-colaborador');
+  if (!select || typeof RECORDS === 'undefined' || !RECORDS || RECORDS.length === 0) return;
+  
+  const valorAtual = select.value || 'TODOS';
+  select.innerHTML = '<option value="TODOS">TODOS</option>';
+  
+  // Extrai os nomes do campo 'nome', remove duplicados e ordena de A a Z
+  const nomesUnicos = [...new Set(RECORDS.map(item => item.nome))].sort();
+  
+  nomesUnicos.forEach(nome => {
+    if (nome) {
+      const option = document.createElement('option');
+      option.value = nome;
+      option.textContent = nome.toUpperCase();
+      select.appendChild(option);
+    }
+  });
+  
+  select.value = valorAtual;
+}
+
+// ==========================================
+// AUDITORIA SILENCIOSA DE DADOS (ANTI-ERROS)
+// ==========================================
+function auditarDadosImportados(registros) {
+  if (!registros || registros.length === 0) return;
+  
+  let errosEncontrados = 0;
+  let linhasComErro = [];
+  
+  registros.forEach((item, index) => {
+    if (!item.nome || !item.tipo || !item.status) {
+      errosEncontrados++;
+      linhasComErro.push(index + 2);
+      return;
+    }
+    
+    const tipoValido = item.tipo.toUpperCase() === 'CRÉDITO' || item.tipo.toUpperCase() === 'DÉBITO';
+    if (!tipoValido) {
+      errosEncontrados++;
+      linhasComErro.push(index + 2);
+    }
+  });
+  
+  if (errosEncontrados > 0) {
+    console.warn(`⚠️ AUDITORIA: Encontrados ${errosEncontrados} registros inconsistentes no arquivo carregado.`);
+    console.warn(`Linhas afetadas no arquivo original:`, linhasComErro.slice(0, 10).join(', ') + (linhasComErro.length > 10 ? '...' : ''));
+  } else {
+    console.log("✅ AUDITORIA: Estrutura do arquivo validada com 100% de integridade.");
+  }
+}
+
+// ==========================================
+// INTERCEPTADOR SEGURO DO GATILHO DO SISTEMA
+// ==========================================
+// Salva a função original de forma segura para evitar loops infinitos (Maximum call stack)
+if (typeof applyFilters === 'function' && typeof applyFiltersBase === 'undefined') {
+  window.applyFiltersBase = applyFilters;
+  
+  // Substitui pelo nosso motor centralizado que orquestra os filtros e auditorias juntos
+  window.applyFilters = function() {
+    // 1. Atualiza os nomes no filtro do colaborador
+    atualizarFiltroDeNomes();
+    
+    // 2. Executa a auditoria no arquivo novo
+    if (typeof RECORDS !== 'undefined') {
+      auditarDadosImportados(RECORDS);
+    }
+    
+    // 3. Roda os filtros nativos originais do painel
+    window.applyFiltersBase();
+  };
+}
+
+// ==========================================
+// TRAVA DE INICIALIZAÇÃO COMPLETA (ABRIR VAZIO)
+// ==========================================
+document.addEventListener('DOMContentLoaded', () => {
+  setTimeout(async () => {
+    
+    // 1. APAGA TODOS OS ARQUIVOS DO HISTÓRICO DO INDEXEDDB
+    try {
+      if (typeof clearHistory === 'function') {
+        await clearHistory(); 
+      }
+      if (typeof refreshHistoryUI === 'function') {
+        await refreshHistoryUI(); 
+      }
+    } catch (e) {
+      console.log("Aguardando inicialização do banco de dados...");
+    }
+
+    // 2. Zera a variável de registros internos
+    if (typeof RECORDS !== 'undefined') {
+      RECORDS = [];
+    }
+    
+    // 3. Reseta o objeto lógico de filtros do sistema
+    if (typeof filters !== 'undefined') {
+      filters = { tipo:'TODOS', status:'TODOS', cargo:'TODOS', colaborador:'TODOS' };
+    }
+    
+    // 4. Limpa os botões de filtros antigos voltando para o estado "TODOS"
+    document.querySelectorAll('.btn-filter').forEach(b => {
+      b.classList.toggle('active', b.dataset.value === 'TODOS');
+    });
+    
+    // 5. Limpa as opções de Status e Cargo (Esvazia as caixas de botões dinâmicos)
+    const divStatus = document.getElementById('filterStatus');
+    if (divStatus) divStatus.innerHTML = ''; 
+    
+    const divCargo = document.getElementById('filterCargo');
+    if (divCargo) divCargo.innerHTML = '';   
+    
+    // 6. Reseta visualmente o filtro de colaborador que criamos
+    const selectColab = document.getElementById('filtro-colaborador');
+    if (selectColab) selectColab.innerHTML = '<option value="TODOS">TODOS</option>';
+    
+    // 7. Limpa o nome do arquivo no cabeçalho
+    const idsCabecalho = ['fileNameHeader', 'currentFileName', 'fileTitle', 'lblFileName', 'uploadTitle'];
+    idsCabecalho.forEach(id => {
+      const elemento = document.getElementById(id);
+      if (elemento) elemento.textContent = ''; 
+    });
+    const classeArquivo = document.querySelector('.file-name') || document.querySelector('.header-file');
+    if (classeArquivo) classeArquivo.textContent = '';
+    
+    // 8. Força a atualização do painel para desenhar tudo ZERADO na tela
+    if (typeof applyFiltersBase === 'function') {
+      window.applyFiltersBase();
+    } else if (typeof applyFilters === 'function') {
+      applyFilters();
+    }
+  }, 400); 
+});
+
+</script>
+
+
+</script>
+</body>
+</html>
